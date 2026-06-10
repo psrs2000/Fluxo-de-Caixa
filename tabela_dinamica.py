@@ -419,95 +419,135 @@ class ImportacaoFrame(tk.Frame):
 
 # ─────────────────────────── TABELA DINÂMICA ───────────────
 
+NOMES_MESES = {1:"Janeiro",2:"Fevereiro",3:"Março",4:"Abril",5:"Maio",6:"Junho",
+               7:"Julho",8:"Agosto",9:"Setembro",10:"Outubro",11:"Novembro",12:"Dezembro"}
+
 class TabelaDinamicaFrame(tk.Frame):
     def __init__(self, parent, app):
         super().__init__(parent, bg="#f5f5f5")
         self.app = app
         self._df = None
+        self._export_data = None   # lista de listas para exportar
+        self._export_cols = []
         self._build()
 
+    # ── construção da UI ──────────────────────────────────────
     def _build(self):
         tk.Label(self, text="Tabela Dinâmica", font=("Segoe UI", 14, "bold"),
-                 bg="#f5f5f5").grid(row=0, column=0, columnspan=4, pady=10)
+                 bg="#f5f5f5").grid(row=0, column=0, columnspan=6, pady=(10, 4))
 
         if not PANDAS_OK:
             tk.Label(self, text="pandas não instalado.", fg="red",
                      bg="#f5f5f5").grid(row=1, column=0)
             return
 
-        cfg = tk.Frame(self, bg="#f5f5f5", bd=1, relief="groove")
-        cfg.grid(row=1, column=0, columnspan=4, padx=10, pady=6, sticky="ew")
-
-        all_cols = ["Ano", "Mes", "Categoria", "Sub_Categoria",
-                    "Transacao", "Descricao", "Valor", "Data"]
-
-        def lbl(parent, text, row, col):
+        def lbl(parent, text, row, col, **kw):
             tk.Label(parent, text=text, bg="#f5f5f5",
-                     font=("Segoe UI", 10, "bold")).grid(row=row, column=col, padx=6, pady=3, sticky="w")
+                     font=("Segoe UI", 10, "bold"), **kw).grid(
+                row=row, column=col, padx=6, pady=3, sticky="w")
 
-        lbl(cfg, "Linhas:", 0, 0)
-        self._rows_var = tk.StringVar(value="Categoria")
-        ttk.Combobox(cfg, textvariable=self._rows_var, values=all_cols, width=16,
-                     state="readonly").grid(row=0, column=1, padx=4)
+        all_dim = ["Ano", "Mes", "Categoria", "Sub_Categoria", "Transacao", "Descricao"]
 
-        lbl(cfg, "Colunas:", 0, 2)
-        self._cols_var = tk.StringVar(value="Ano")
-        ttk.Combobox(cfg, textvariable=self._cols_var, values=["(nenhuma)"] + all_cols, width=16,
-                     state="readonly").grid(row=0, column=3, padx=4)
+        # ── bloco ESTRUTURA ───────────────────────────────────
+        grp_struct = tk.LabelFrame(self, text="  Estrutura  ", bg="#f5f5f5",
+                                   font=("Segoe UI", 9, "bold"))
+        grp_struct.grid(row=1, column=0, columnspan=6, padx=10, pady=4, sticky="ew")
 
-        lbl(cfg, "Valores:", 1, 0)
-        self._vals_var = tk.StringVar(value="Valor")
-        ttk.Combobox(cfg, textvariable=self._vals_var, values=["Valor"], width=16,
-                     state="readonly").grid(row=1, column=1, padx=4)
+        lbl(grp_struct, "Linha 1 (grupo):", 0, 0)
+        self._row1_var = tk.StringVar(value="Categoria")
+        ttk.Combobox(grp_struct, textvariable=self._row1_var, values=all_dim,
+                     width=16, state="readonly").grid(row=0, column=1, padx=4, pady=3)
 
-        lbl(cfg, "Agregar:", 1, 2)
+        lbl(grp_struct, "Linha 2 (subgrupo):", 0, 2)
+        self._row2_var = tk.StringVar(value="Descricao")
+        ttk.Combobox(grp_struct, textvariable=self._row2_var,
+                     values=["(nenhuma)"] + all_dim,
+                     width=16, state="readonly").grid(row=0, column=3, padx=4, pady=3)
+
+        lbl(grp_struct, "Colunas:", 0, 4)
+        self._cols_var = tk.StringVar(value="Mes")
+        ttk.Combobox(grp_struct, textvariable=self._cols_var,
+                     values=["(nenhuma)"] + all_dim,
+                     width=14, state="readonly").grid(row=0, column=5, padx=4, pady=3)
+
+        lbl(grp_struct, "Agregar Valor:", 1, 0)
         self._agg_var = tk.StringVar(value="sum")
-        ttk.Combobox(cfg, textvariable=self._agg_var,
-                     values=["sum", "count", "mean", "min", "max"], width=16,
-                     state="readonly").grid(row=1, column=3, padx=4)
+        ttk.Combobox(grp_struct, textvariable=self._agg_var,
+                     values=["sum", "count", "mean", "min", "max"],
+                     width=10, state="readonly").grid(row=1, column=1, padx=4, pady=3)
 
-        # filtros
-        filter_frame = tk.Frame(self, bg="#f5f5f5", bd=1, relief="groove")
-        filter_frame.grid(row=2, column=0, columnspan=4, padx=10, pady=4, sticky="ew")
-        lbl(filter_frame, "Filtros:", 0, 0)
+        lbl(grp_struct, "Subtotais:", 1, 2)
+        self._subtotal_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(grp_struct, variable=self._subtotal_var,
+                       bg="#f5f5f5").grid(row=1, column=3, sticky="w")
 
-        lbl(filter_frame, "Ano:", 0, 1)
+        lbl(grp_struct, "Total Geral:", 1, 4)
+        self._total_var = tk.BooleanVar(value=True)
+        tk.Checkbutton(grp_struct, variable=self._total_var,
+                       bg="#f5f5f5").grid(row=1, column=5, sticky="w")
+
+        # ── bloco FILTROS ─────────────────────────────────────
+        grp_filt = tk.LabelFrame(self, text="  Filtros de Relatório  ", bg="#f5f5f5",
+                                  font=("Segoe UI", 9, "bold"))
+        grp_filt.grid(row=2, column=0, columnspan=6, padx=10, pady=4, sticky="ew")
+
+        lbl(grp_filt, "Ano:", 0, 0)
         self._f_ano = tk.StringVar(value="(todos)")
-        self._cb_ano = ttk.Combobox(filter_frame, textvariable=self._f_ano, width=8, state="readonly")
-        self._cb_ano.grid(row=0, column=2, padx=4)
+        self._cb_ano = ttk.Combobox(grp_filt, textvariable=self._f_ano, width=8, state="readonly")
+        self._cb_ano.grid(row=0, column=1, padx=4, pady=3)
 
-        lbl(filter_frame, "Mês:", 0, 3)
+        lbl(grp_filt, "Mês:", 0, 2)
         self._f_mes = tk.StringVar(value="(todos)")
-        meses = ["(todos)", "1", "2", "3", "4", "5", "6",
-                 "7", "8", "9", "10", "11", "12"]
-        ttk.Combobox(filter_frame, textvariable=self._f_mes, values=meses,
-                     width=6, state="readonly").grid(row=0, column=4, padx=4)
+        meses_vals = ["(todos)"] + [f"{i} – {NOMES_MESES[i]}" for i in range(1, 13)]
+        self._cb_mes = ttk.Combobox(grp_filt, textvariable=self._f_mes,
+                                     values=meses_vals, width=14, state="readonly")
+        self._cb_mes.grid(row=0, column=3, padx=4, pady=3)
 
-        lbl(filter_frame, "Categoria:", 0, 5)
+        lbl(grp_filt, "Categoria:", 0, 4)
         self._f_cat = tk.StringVar(value="(todos)")
-        self._cb_cat = ttk.Combobox(filter_frame, textvariable=self._f_cat, width=14, state="readonly")
-        self._cb_cat.grid(row=0, column=6, padx=4)
+        self._cb_cat = ttk.Combobox(grp_filt, textvariable=self._f_cat, width=18, state="readonly")
+        self._cb_cat.grid(row=0, column=5, padx=4, pady=3)
 
+        lbl(grp_filt, "Transação:", 1, 0)
+        self._f_tran = tk.StringVar(value="(todos)")
+        self._cb_tran = ttk.Combobox(grp_filt, textvariable=self._f_tran, width=20, state="readonly")
+        self._cb_tran.grid(row=1, column=1, columnspan=2, padx=4, pady=3, sticky="w")
+
+        lbl(grp_filt, "Sub-Categoria:", 1, 4)
+        self._f_sub = tk.StringVar(value="(todos)")
+        self._cb_sub = ttk.Combobox(grp_filt, textvariable=self._f_sub, width=18, state="readonly")
+        self._cb_sub.grid(row=1, column=5, padx=4, pady=3)
+
+        # ── botões ────────────────────────────────────────────
         btn_frame = tk.Frame(self, bg="#f5f5f5")
-        btn_frame.grid(row=3, column=0, columnspan=4, pady=8)
-        tk.Button(btn_frame, text="Gerar Tabela", command=self._gerar,
-                  bg="#4CAF50", fg="white", width=14,
+        btn_frame.grid(row=3, column=0, columnspan=6, pady=6)
+        tk.Button(btn_frame, text="▶  Gerar Tabela", command=self._gerar,
+                  bg="#4CAF50", fg="white", width=16,
                   font=("Segoe UI", 10, "bold")).pack(side="left", padx=6)
         tk.Button(btn_frame, text="Exportar XLSX", command=self._exportar,
                   bg="#1565C0", fg="white", width=14,
                   font=("Segoe UI", 10)).pack(side="left", padx=6)
-        tk.Button(btn_frame, text="Atualizar Filtros", command=self._atualizar_filtros,
-                  bg="#757575", fg="white", width=14,
+        tk.Button(btn_frame, text="↺  Atualizar Filtros", command=self._atualizar_filtros,
+                  bg="#757575", fg="white", width=16,
                   font=("Segoe UI", 10)).pack(side="left", padx=6)
 
-        # resultado
+        # ── resultado ─────────────────────────────────────────
         res_frame = tk.Frame(self)
-        res_frame.grid(row=4, column=0, columnspan=4, sticky="nsew", padx=8, pady=4)
+        res_frame.grid(row=4, column=0, columnspan=6, sticky="nsew", padx=8, pady=4)
         self.rowconfigure(4, weight=1)
-        self.columnconfigure(3, weight=1)
+        self.columnconfigure(5, weight=1)
 
-        self.result_tree = ttk.Treeview(res_frame, show="headings")
-        vsb = ttk.Scrollbar(res_frame, orient="vertical", command=self.result_tree.yview)
+        style = ttk.Style()
+        style.configure("Pivot.Treeview", font=("Segoe UI", 9), rowheight=22)
+        style.configure("Pivot.Treeview.Heading", font=("Segoe UI", 9, "bold"))
+
+        self.result_tree = ttk.Treeview(res_frame, show="headings", style="Pivot.Treeview",
+                                         selectmode="browse")
+        self.result_tree.tag_configure("grupo",   font=("Segoe UI", 9, "bold"), background="#dce8f5")
+        self.result_tree.tag_configure("total",   font=("Segoe UI", 9, "bold"), background="#c8e6c9")
+        self.result_tree.tag_configure("subitem", font=("Segoe UI", 9))
+
+        vsb = ttk.Scrollbar(res_frame, orient="vertical",   command=self.result_tree.yview)
         hsb = ttk.Scrollbar(res_frame, orient="horizontal", command=self.result_tree.xview)
         self.result_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         self.result_tree.grid(row=0, column=0, sticky="nsew")
@@ -517,31 +557,45 @@ class TabelaDinamicaFrame(tk.Frame):
         res_frame.columnconfigure(0, weight=1)
 
         self._status_lbl = tk.Label(self, text="", bg="#f5f5f5", font=("Segoe UI", 9))
-        self._status_lbl.grid(row=5, column=0, columnspan=4)
+        self._status_lbl.grid(row=5, column=0, columnspan=6)
         self._atualizar_filtros()
 
+    # ── dados ─────────────────────────────────────────────────
     def _carregar_df(self):
         cols, rows = buscar_todos()
         if not rows:
             return pd.DataFrame()
         df = pd.DataFrame(rows, columns=cols)
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
-        df["Mes"] = pd.to_numeric(df["Mes"], errors="coerce")
-        df["Ano"] = pd.to_numeric(df["Ano"], errors="coerce")
+        df["Mes"]   = pd.to_numeric(df["Mes"],   errors="coerce")
+        df["Ano"]   = pd.to_numeric(df["Ano"],   errors="coerce")
         return df
 
     def _atualizar_filtros(self):
         df = self._carregar_df()
         self._df = df
+        vazio = ["(todos)"]
         if df.empty:
-            self._cb_ano["values"] = ["(todos)"]
-            self._cb_cat["values"] = ["(todos)"]
+            for cb in (self._cb_ano, self._cb_cat, self._cb_tran, self._cb_sub):
+                cb["values"] = vazio
             return
-        anos = ["(todos)"] + sorted(df["Ano"].dropna().unique().astype(int).astype(str).tolist())
-        cats = ["(todos)"] + sorted(df["Categoria"].dropna().unique().tolist())
-        self._cb_ano["values"] = anos
-        self._cb_cat["values"] = cats
+        anos  = vazio + sorted(df["Ano"].dropna().unique().astype(int).astype(str).tolist())
+        cats  = vazio + sorted(df["Categoria"].dropna().unique().tolist())
+        trans = vazio + sorted(df["Transacao"].dropna().unique().tolist())
+        subs  = vazio + sorted(df["Sub_Categoria"].dropna().unique().tolist())
+        self._cb_ano["values"]  = anos
+        self._cb_cat["values"]  = cats
+        self._cb_tran["values"] = trans
+        self._cb_sub["values"]  = subs
 
+    # ── formatar valor ────────────────────────────────────────
+    @staticmethod
+    def _fmt(v):
+        if isinstance(v, (int, float)):
+            return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return str(v) if v is not None else ""
+
+    # ── gerar tabela ──────────────────────────────────────────
     def _gerar(self):
         self._atualizar_filtros()
         df = self._df.copy() if self._df is not None else self._carregar_df()
@@ -549,67 +603,122 @@ class TabelaDinamicaFrame(tk.Frame):
             messagebox.showinfo("Info", "Banco de dados vazio.")
             return
 
-        # filtros
+        # aplicar filtros
         if self._f_ano.get() != "(todos)":
             df = df[df["Ano"] == int(self._f_ano.get())]
-        if self._f_mes.get() != "(todos)":
-            df = df[df["Mes"] == int(self._f_mes.get())]
-        if self._f_cat.get() != "(todos)":
-            df = df[df["Categoria"] == self._f_cat.get()]
+        mes_sel = self._f_mes.get()
+        if mes_sel != "(todos)":
+            num_mes = int(mes_sel.split(" – ")[0])
+            df = df[df["Mes"] == num_mes]
+        if self._f_cat.get()  != "(todos)": df = df[df["Categoria"]    == self._f_cat.get()]
+        if self._f_tran.get() != "(todos)": df = df[df["Transacao"]    == self._f_tran.get()]
+        if self._f_sub.get()  != "(todos)": df = df[df["Sub_Categoria"]== self._f_sub.get()]
 
         if df.empty:
             messagebox.showinfo("Info", "Nenhum dado para os filtros selecionados.")
             return
 
-        row_field = self._rows_var.get()
-        col_field = self._cols_var.get()
-        agg = self._agg_var.get()
+        row1     = self._row1_var.get()
+        row2     = self._row2_var.get()
+        col_fld  = self._cols_var.get()
+        agg      = self._agg_var.get()
+        subtotal = self._subtotal_var.get()
+        total_g  = self._total_var.get()
+        use_row2 = (row2 != "(nenhuma)")
+        use_cols = (col_fld != "(nenhuma)")
 
-        try:
-            if col_field == "(nenhuma)":
-                pivot = df.groupby(row_field)["Valor"].agg(agg).reset_index()
-                pivot.columns = [row_field, agg.upper()]
-                pivot["TOTAL"] = pivot[agg.upper()]
+        # determinar colunas dinâmicas
+        if use_cols:
+            col_vals = sorted(df[col_fld].dropna().unique().tolist(),
+                              key=lambda x: (int(x) if str(x).lstrip("-").isdigit() else 0, str(x)))
+        else:
+            col_vals = ["Valor"]
+
+        # helper de agregação
+        def agregar(sub):
+            if agg == "sum":   return sub["Valor"].sum()
+            if agg == "count": return sub["Valor"].count()
+            if agg == "mean":  return sub["Valor"].mean()
+            if agg == "min":   return sub["Valor"].min()
+            if agg == "max":   return sub["Valor"].max()
+            return 0
+
+        def vals_por_col(sub):
+            if use_cols:
+                return {str(cv): agregar(sub[sub[col_fld] == cv]) for cv in col_vals}
             else:
-                pivot = pd.pivot_table(
-                    df,
-                    values="Valor",
-                    index=row_field,
-                    columns=col_field,
-                    aggfunc=agg,
-                    fill_value=0,
-                    margins=True,
-                    margins_name="TOTAL",
-                )
-                pivot = pivot.reset_index()
-                pivot.columns = [str(c) for c in pivot.columns]
-        except Exception as e:
-            messagebox.showerror("Erro", str(e))
-            return
+                return {"Valor": agregar(sub)}
 
-        self._pivot_df = pivot
-        cols = list(pivot.columns)
-        self.result_tree["columns"] = cols
+        # montar colunas do treeview
+        tree_cols_labels = [row1] + ([row2] if use_row2 else []) + [str(cv) for cv in col_vals] + ["Total Geral"]
+        tree_cols_ids    = [f"c{i}" for i in range(len(tree_cols_labels))]
+
+        self.result_tree["columns"] = tree_cols_ids
         for i in self.result_tree.get_children():
             self.result_tree.delete(i)
-        for col in cols:
-            self.result_tree.heading(col, text=str(col))
-            self.result_tree.column(col, width=max(80, len(str(col)) * 9), anchor="center")
+        for cid, clbl in zip(tree_cols_ids, tree_cols_labels):
+            w = 160 if cid == "c0" else (130 if (use_row2 and cid == "c1") else 85)
+            self.result_tree.heading(cid, text=str(clbl))
+            self.result_tree.column(cid, width=w,
+                                    anchor="w" if cid in ("c0", "c1") else "e")
 
-        for _, row in pivot.iterrows():
-            vals = []
-            for v in row:
-                if isinstance(v, float):
-                    vals.append(f"{v:,.2f}")
-                else:
-                    vals.append(str(v))
-            self.result_tree.insert("", "end", values=vals)
+        export_rows = [tree_cols_labels]
+        grand_totals = {str(cv): 0.0 for cv in col_vals}
 
+        grupos = sorted(df[row1].dropna().unique().tolist())
+        for g in grupos:
+            g_df = df[df[row1] == g]
+            g_col_vals = vals_por_col(g_df)
+            g_total    = sum(g_col_vals.values())
+            for k in grand_totals:
+                grand_totals[k] += g_col_vals.get(k, 0)
+
+            if use_row2:
+                # linha de grupo (sem valores, só o nome — como Excel)
+                grp_row = [g] + [""] + [""] * len(col_vals) + [""]
+                iid_grp = self.result_tree.insert("", "end", values=grp_row, tags=("grupo",))
+                export_rows.append(grp_row)
+
+                subgrupos = sorted(g_df[row2].dropna().unique().tolist())
+                for sg in subgrupos:
+                    sg_df = g_df[g_df[row2] == sg]
+                    sg_cv = vals_por_col(sg_df)
+                    sg_tot = sum(sg_cv.values())
+                    sub_row = [""] + [str(sg)] + \
+                              [self._fmt(sg_cv.get(str(cv), "")) for cv in col_vals] + \
+                              [self._fmt(sg_tot)]
+                    self.result_tree.insert("", "end", values=sub_row, tags=("subitem",))
+                    export_rows.append(sub_row)
+
+                if subtotal:
+                    sub_total_row = [f"{g} Total"] + [""] + \
+                                    [self._fmt(g_col_vals.get(str(cv), "")) for cv in col_vals] + \
+                                    [self._fmt(g_total)]
+                    self.result_tree.insert("", "end", values=sub_total_row, tags=("grupo",))
+                    export_rows.append(sub_total_row)
+            else:
+                # sem row2: linha simples por grupo
+                row_vals = [g] + [self._fmt(g_col_vals.get(str(cv), "")) for cv in col_vals] + \
+                           [self._fmt(g_total)]
+                self.result_tree.insert("", "end", values=row_vals, tags=("grupo",))
+                export_rows.append(row_vals)
+
+        if total_g:
+            gt_total = sum(grand_totals.values())
+            total_row = ["Total Geral"] + ([""] if use_row2 else []) + \
+                        [self._fmt(grand_totals.get(str(cv), "")) for cv in col_vals] + \
+                        [self._fmt(gt_total)]
+            self.result_tree.insert("", "end", values=total_row, tags=("total",))
+            export_rows.append(total_row)
+
+        self._export_data = export_rows
+        self._export_cols = tree_cols_labels
         self._status_lbl.config(
-            text=f"{len(pivot)-1 if col_field != '(nenhuma)' else len(pivot)} linhas | agreg: {agg} | filtros aplicados")
+            text=f"{len(grupos)} grupos | {len(df)} registros | agreg: {agg}")
 
+    # ── exportar ──────────────────────────────────────────────
     def _exportar(self):
-        if not hasattr(self, "_pivot_df") or self._pivot_df is None:
+        if not self._export_data:
             messagebox.showinfo("Info", "Gere a tabela antes de exportar.")
             return
         if not OPENPYXL_OK:
@@ -617,9 +726,29 @@ class TabelaDinamicaFrame(tk.Frame):
             return
         path = filedialog.asksaveasfilename(defaultextension=".xlsx",
                                             filetypes=[("Excel", "*.xlsx")])
-        if path:
-            self._pivot_df.to_excel(path, index=False)
-            messagebox.showinfo("Sucesso", f"Exportado para:\n{path}")
+        if not path:
+            return
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Tabela Dinâmica"
+        for r_idx, row in enumerate(self._export_data, start=1):
+            for c_idx, val in enumerate(row, start=1):
+                cell = ws.cell(row=r_idx, column=c_idx, value=val)
+                if r_idx == 1:
+                    cell.font = Font(bold=True)
+                    cell.fill = PatternFill("solid", fgColor="4472C4")
+                    cell.font = Font(bold=True, color="FFFFFF")
+                elif "Total" in str(row[0]):
+                    cell.font = Font(bold=True)
+                    cell.fill = PatternFill("solid", fgColor="E2EFDA")
+                cell.alignment = Alignment(horizontal="right" if c_idx > 2 else "left")
+        for col in ws.columns:
+            max_len = max((len(str(c.value or "")) for c in col), default=8)
+            ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 40)
+        wb.save(path)
+        messagebox.showinfo("Sucesso", f"Exportado para:\n{path}")
 
 
 # ─────────────────────────── APLICATIVO PRINCIPAL ──────────
