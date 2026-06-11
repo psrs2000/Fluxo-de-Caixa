@@ -28,8 +28,14 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel, QStringListModel
 from PyQt5.QtGui import QColor, QBrush, QFont, QPalette
 
-DB_PATH  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dados.db")
-CFG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+def _app_dir() -> str:
+    """Retorna a pasta do .exe (quando compilado) ou do .py (em desenvolvimento)."""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+DB_PATH  = os.path.join(_app_dir(), "dados.db")
+CFG_PATH = os.path.join(_app_dir(), "config.json")
 
 
 def cfg_load() -> dict:
