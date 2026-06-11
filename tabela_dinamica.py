@@ -334,6 +334,18 @@ class AbaForm(QWidget):
         flt_lay.addStretch()
         root.addWidget(flt_grp)
 
+        # ── faixa acima da tabela com soma à direita ──────
+        pre_table = QHBoxLayout()
+        pre_table.setContentsMargins(0, 0, 0, 0)
+        pre_table.addStretch()
+        self._lbl_soma = QLabel("Soma: R$ 0,00")
+        self._lbl_soma.setStyleSheet(
+            "font-weight:bold; font-size:14px; color:#c62828;"
+            "padding:1px 6px;")
+        self._lbl_soma.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        pre_table.addWidget(self._lbl_soma)
+        root.addLayout(pre_table)
+
         # ── tabela ────────────────────────────────────────
         self._table = QTableWidget(0, len(COLS_DADOS))
         self._table.setHorizontalHeaderLabels(COLS_DADOS)
@@ -349,19 +361,12 @@ class AbaForm(QWidget):
         self._table.itemSelectionChanged.connect(self._on_select)
         root.addWidget(self._table, 1)
 
-        # ── rodapé: status + soma alinhada à direita ──────
-        footer = QHBoxLayout()
+        # ── rodapé: status ────────────────────────────────
         self._status = QLabel("")
         self._status.setStyleSheet("color:#555; font-size:10px")
-        footer.addWidget(self._status, 1)
+        root.addWidget(self._status)
 
-        self._lbl_soma = QLabel("Soma: R$ 0,00")
-        self._lbl_soma.setStyleSheet(
-            "font-weight:bold; font-size:13px; padding:2px 10px;"
-            "border:1px solid #bbb; border-radius:4px; background:#f0f0f0")
-        self._lbl_soma.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        footer.addWidget(self._lbl_soma)
-        root.addLayout(footer)
+        self._carregar()
 
         self._carregar()
 
@@ -522,8 +527,8 @@ class AbaForm(QWidget):
         self._table.resizeColumnsToContents()           # ← auto-ajuste
         self._lbl_soma.setText(f"Soma: {fmt_valor(soma)}")
         self._lbl_soma.setStyleSheet(
-            f"font-weight:bold;font-size:11px;padding:0 8px;"
-            f"color:{'#c62828' if soma < 0 else '#1b5e20'}")
+            f"font-weight:bold; font-size:14px; padding:1px 6px;"
+            f"color:{'#c62828' if soma < 0 else '#1b5e20'};")
         total = len(self._all_rows)
         self._status.setText(
             f"Exibindo {vis} de {total} registros" +
