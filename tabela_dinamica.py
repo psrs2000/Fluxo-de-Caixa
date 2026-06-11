@@ -320,7 +320,7 @@ class AbaForm(QWidget):
             self._flt_widgets[key] = ed
 
         flt_lay.addWidget(QLabel("Ano:"))
-        self._flt_ano = QComboBox(); self._flt_ano.setFixedWidth(70)
+        self._flt_ano = QComboBox(); self._flt_ano.setFixedWidth(90)
         self._flt_ano.currentTextChanged.connect(self._aplicar_filtro)
         flt_lay.addWidget(self._flt_ano)
 
@@ -518,12 +518,21 @@ class AbaForm(QWidget):
             soma += float(r[8] or 0)
             vis += 1
         self._table.setSortingEnabled(True)
-        self._table.resizeColumnsToContents()
-        # atualiza cabeçalho da coluna Valor com a soma
+        # atualiza cabeçalho da coluna Valor com a soma ANTES do resize
         cor_hex = "#c62828" if soma < 0 else "#1b5e20"
         hdr_item = self._table.horizontalHeaderItem(8)
         hdr_item.setText(f"Valor  |  {fmt_valor(soma)}")
         hdr_item.setForeground(QBrush(QColor(cor_hex)))
+        # auto-ajuste: considera conteúdo E cabeçalho de cada coluna
+        self._table.resizeColumnsToContents()
+        hdr = self._table.horizontalHeader()
+        fm = self._table.fontMetrics()
+        for col in range(self._table.columnCount()):
+            hdr_txt = self._table.horizontalHeaderItem(col)
+            hdr_w = fm.horizontalAdvance(hdr_txt.text() if hdr_txt else "") + 24
+            cur_w = hdr.sectionSize(col)
+            if hdr_w > cur_w:
+                hdr.resizeSection(col, hdr_w)
         total = len(self._all_rows)
         self._status.setText(
             f"Exibindo {vis} de {total} registros" +
@@ -539,13 +548,17 @@ class AbaForm(QWidget):
 
     # ── exportação ────────────────────────────────────────
     def _linhas_visiveis(self):
-        """Retorna os dados das linhas atualmente visíveis na tabela."""
+        """Retorna linhas visíveis; coluna Valor como número puro (sem R$)."""
         rows = []
         for i in range(self._table.rowCount()):
             row = []
             for j in range(self._table.columnCount()):
                 it = self._table.item(i, j)
-                row.append(it.text() if it else "")
+                if j == 8 and it:                          # coluna Valor
+                    raw = it.data(Qt.UserRole)
+                    row.append(raw if raw is not None else "")
+                else:
+                    row.append(it.text() if it else "")
             rows.append(row)
         return rows
 
