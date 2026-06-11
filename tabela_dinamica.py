@@ -226,9 +226,9 @@ def _btn(texto, cor_bg, slot, min_w=100):
     """Cria um QPushButton padronizado."""
     b = QPushButton(texto)
     b.setStyleSheet(
-        f"QPushButton{{background:{cor_bg};color:white;border-radius:4px;"
-        f"padding:4px 12px;font-weight:bold;}}"
-        f"QPushButton:hover{{opacity:0.85;}}"
+        f"QPushButton{{background:{cor_bg};color:white;border-radius:5px;"
+        f"padding:6px 18px;font-weight:bold;font-size:12px;}}"
+        f"QPushButton:hover{{background:{cor_bg};border:1px solid rgba(0,0,0,0.2);}}"
     )
     b.setMinimumWidth(min_w)
     b.clicked.connect(slot)
@@ -332,11 +332,6 @@ class AbaForm(QWidget):
         btn_limpar_flt = _btn("✕ Limpar", "#757575", self._limpar_filtros, 80)
         flt_lay.addWidget(btn_limpar_flt)
         flt_lay.addStretch()
-
-        # somatória filtrada
-        self._lbl_soma = QLabel("Soma: R$ 0,00")
-        self._lbl_soma.setStyleSheet("font-weight:bold; font-size:11px; padding: 0 8px")
-        flt_lay.addWidget(self._lbl_soma)
         root.addWidget(flt_grp)
 
         # ── tabela ────────────────────────────────────────
@@ -350,13 +345,23 @@ class AbaForm(QWidget):
         hdr.setSectionResizeMode(QHeaderView.Interactive)
         hdr.setStretchLastSection(False)
         hdr.setSortIndicatorShown(True)
-        self._table.setSortingEnabled(True)          # ← classificação por coluna
+        self._table.setSortingEnabled(True)
         self._table.itemSelectionChanged.connect(self._on_select)
         root.addWidget(self._table, 1)
 
+        # ── rodapé: status + soma alinhada à direita ──────
+        footer = QHBoxLayout()
         self._status = QLabel("")
         self._status.setStyleSheet("color:#555; font-size:10px")
-        root.addWidget(self._status)
+        footer.addWidget(self._status, 1)
+
+        self._lbl_soma = QLabel("Soma: R$ 0,00")
+        self._lbl_soma.setStyleSheet(
+            "font-weight:bold; font-size:13px; padding:2px 10px;"
+            "border:1px solid #bbb; border-radius:4px; background:#f0f0f0")
+        self._lbl_soma.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        footer.addWidget(self._lbl_soma)
+        root.addLayout(footer)
 
         self._carregar()
 
@@ -576,7 +581,7 @@ class AbaImport(QWidget):
         lay_modo = QVBoxLayout(grp_modo)
         self._rb_add = QRadioButton("Acrescentar ao banco existente")
         self._rb_ow  = QRadioButton("Sobrescrever banco (apaga tudo antes)")
-        self._rb_ow.setStyleSheet("color:#c62828")
+        self._rb_ow.setStyleSheet("color:#c62828; font-size:12px; font-weight:bold")
         self._rb_add.setChecked(True)
         lay_modo.addWidget(self._rb_add)
         lay_modo.addWidget(self._rb_ow)
