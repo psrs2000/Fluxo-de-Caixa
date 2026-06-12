@@ -480,12 +480,16 @@ class AbaForm(QWidget):
     def _excluir(self):
         sel = self._table.selectionModel().selectedRows()
         if not sel:
-            QMessageBox.information(self, "Info", "Selecione um registro para excluir.")
+            QMessageBox.information(self, "Info", "Selecione um ou mais registros para excluir.")
             return
-        if QMessageBox.question(self, "Confirmar", "Excluir registro selecionado?",
+        count = len(sel)
+        msg = (f"Excluir {count} registros selecionados?"
+               if count > 1 else "Excluir registro selecionado?")
+        if QMessageBox.question(self, "Confirmar", msg,
                                 QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
-            rid = int(self._table.item(sel[0].row(), 0).text())
-            deletar(rid)
+            rids = [int(self._table.item(idx.row(), 0).text()) for idx in sel]
+            for rid in rids:
+                deletar(rid)
             self._limpar()
             self._carregar()
 
@@ -675,47 +679,99 @@ class AbaImport(QWidget):
 
     def _build(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 8)
+        root.setContentsMargins(12, 16, 12, 8)
+        root.setSpacing(10)
 
         if not PANDAS_OK:
             root.addWidget(QLabel(
                 "pandas não instalado.\nExecute: pip install pandas openpyxl xlrd"))
             return
 
-        # arquivo
-        grp_arq = QGroupBox("Arquivo")
-        lay_arq = QGridLayout(grp_arq)
-        lay_arq.addWidget(QLabel("Arquivo:"), 0, 0)
-        self._path = QLineEdit(); self._path.setReadOnly(True)
-        lay_arq.addWidget(self._path, 0, 1)
+        # ── título centralizado ───────────────────────────
+        title = QLabel("Importar Arquivo")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size:16px; font-weight:bold; margin-bottom:6px;")
+        root.addWidget(title)
+
+        # ── container centralizado com formulário ─────────
+        center_container = QWidget()
+        center_layout = QHBoxLayout(center_container)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+
+        form_widget = QWidget()
+        form_widget.setMaximumWidth(500)
+        form_layout = QFormLayout(form_widget)
+        form_layout.setSpacing(10)
+        form_layout.setContentsMargins(0, 0, 0, 0)
+        form_layout.setLabelAlignment(Qt.AlignRight)
+
+        # Arquivo
+        arq_lbl = QLabel("Arquivo:")
+        arq_row = QHBoxLayout()
+        self._path = QLineEdit()
+        self._path.setReadOnly(True)
+        self._path.setMinimumWidth(260)
         btn_browse = QPushButton("...")
         btn_browse.setFixedWidth(36)
         btn_browse.clicked.connect(self._browse)
-        lay_arq.addWidget(btn_browse, 0, 2)
-        lay_arq.addWidget(QLabel("Separador CSV:"), 1, 0)
-        self._sep = QLineEdit(";"); self._sep.setFixedWidth(40)
-        lay_arq.addWidget(self._sep, 1, 1, Qt.AlignLeft)
-        root.addWidget(grp_arq)
+        arq_row.addWidget(self._path)
+        arq_row.addWidget(btn_browse)
+        form_layout.addRow(arq_lbl, arq_row)
 
-        # modo
-        grp_modo = QGroupBox("Modo de Importação")
-        lay_modo = QVBoxLayout(grp_modo)
+        # Separador CSV
+        sep_lbl = QLabel("Separador CSV:")
+        self._sep = QLineEdit(";")
+        self._sep.setFixedWidth(40)
+        form_layout.addRow(sep_lbl, self._sep)
+
+        center_layout.addStretch()
+        center_layout.addWidget(form_widget)
+        center_layout.addStretch()
+        root.addWidget(center_container)
+
+        # ── modo de importação (label + radio buttons centrados) ──
+        modo_lbl = QLabel("Modo de importação:")
+        modo_lbl.setAlignment(Qt.AlignCenter)
+        modo_lbl.setStyleSheet("font-weight:bold; font-size:13px; margin-top:4px;")
+        root.addWidget(modo_lbl)
+
+        radio_container = QWidget()
+        radio_layout = QHBoxLayout(radio_container)
+        radio_layout.setContentsMargins(0, 0, 0, 0)
         self._rb_add = QRadioButton("Acrescentar ao banco existente")
         self._rb_ow  = QRadioButton("Sobrescrever banco (apaga tudo antes)")
         self._rb_ow.setStyleSheet("color:#c62828; font-size:12px; font-weight:bold")
         self._rb_add.setChecked(True)
-        lay_modo.addWidget(self._rb_add)
-        lay_modo.addWidget(self._rb_ow)
-        root.addWidget(grp_modo)
+        radio_layout.addStretch()
+        radio_layout.addWidget(self._rb_add)
+        radio_layout.addSpacing(20)
+        radio_layout.addWidget(self._rb_ow)
+        radio_layout.addStretch()
+        root.addWidget(radio_container)
 
-        # botão
-        btn_imp = _btn("Importar", "#4CAF50", self._importar, 120)
-        root.addWidget(btn_imp)
+        # ── botão Importar centralizado ───────────────────
+        btn_container = QWidget()
+        btn_layout = QHBoxLayout(btn_container)
+        btn_layout.setContentsMargins(0, 4, 0, 4)
+        btn_imp = QPushButton("Importar")
+        btn_imp.setStyleSheet(
+            "QPushButton{background:#4CAF50;color:white;border-radius:6px;"
+            "padding:10px 28px;font-weight:bold;font-size:14px;}"
+            "QPushButton:hover{background:#43A047;border:1px solid rgba(0,0,0,0.2);}"
+        )
+        btn_imp.setFixedWidth(180)
+        btn_imp.clicked.connect(self._importar)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_imp)
+        btn_layout.addStretch()
+        root.addWidget(btn_container)
 
+        # ── status centralizado ───────────────────────────
         self._status = QLabel("")
+        self._status.setAlignment(Qt.AlignCenter)
         root.addWidget(self._status)
 
-        # preview
+        # ── preview (preenche espaço restante) ────────────
         grp_prev = QGroupBox("Pré-visualização (20 primeiras linhas)")
         lay_prev = QVBoxLayout(grp_prev)
         self._preview = QTableWidget(0, 0)
@@ -888,7 +944,15 @@ class AbaPivot(QWidget):
         self._status.setStyleSheet("color:#555")
         root.addWidget(self._status)
 
+        # ── conectar sinais para auto-gerar ───────────────
+        for cb in (self._row1, self._row2, self._cols, self._agg,
+                   self._f_ano, self._f_mes, self._f_cat, self._f_tran, self._f_sub):
+            cb.currentIndexChanged.connect(self._gerar)
+        for chk in (self._chk_sub, self._chk_total):
+            chk.stateChanged.connect(self._gerar)
+
         self._atualizar_filtros()
+        self._restaurar_config_pivot()
 
     # ── dados ─────────────────────────────────────────────
     def _carregar_df(self):
@@ -921,9 +985,42 @@ class AbaPivot(QWidget):
                          (self._f_tran, trans), (self._f_sub, subs),
                          (self._f_mes, meses)):
             cur = cb.currentText()
+            cb.blockSignals(True)
             cb.clear(); cb.addItems(vals)
             idx = cb.findText(cur)
             if idx >= 0: cb.setCurrentIndex(idx)
+            cb.blockSignals(False)
+
+    # ── restaurar configuração salva ──────────────────────
+    def _restaurar_config_pivot(self):
+        cfg = cfg_load().get("pivot_config")
+        if not cfg:
+            return
+        # block signals during restore to avoid multiple _gerar calls
+        widgets = [self._row1, self._row2, self._cols, self._agg,
+                   self._f_ano, self._f_mes, self._f_cat, self._f_tran, self._f_sub,
+                   self._chk_sub, self._chk_total]
+        for w in widgets:
+            w.blockSignals(True)
+        try:
+            for attr, key in [("_row1", "row1"), ("_row2", "row2"),
+                               ("_cols", "cols"), ("_agg", "agg"),
+                               ("_f_ano", "f_ano"), ("_f_mes", "f_mes"),
+                               ("_f_cat", "f_cat"), ("_f_tran", "f_tran"),
+                               ("_f_sub", "f_sub")]:
+                val = cfg.get(key)
+                if val is not None:
+                    cb = getattr(self, attr)
+                    idx = cb.findText(val)
+                    if idx >= 0:
+                        cb.setCurrentIndex(idx)
+            if "subtotais" in cfg:
+                self._chk_sub.setChecked(bool(cfg["subtotais"]))
+            if "total_geral" in cfg:
+                self._chk_total.setChecked(bool(cfg["total_geral"]))
+        finally:
+            for w in widgets:
+                w.blockSignals(False)
 
     # ── gerar ─────────────────────────────────────────────
     def _gerar(self):
@@ -933,7 +1030,6 @@ class AbaPivot(QWidget):
             QMessageBox.warning(self, "Erro", "pandas não instalado.")
             return
         if df.empty:
-            QMessageBox.information(self, "Info", "Banco de dados vazio.")
             return
 
         # filtros
@@ -950,7 +1046,8 @@ class AbaPivot(QWidget):
             df = df[df["Sub_Categoria"] == self._f_sub.currentText()]
 
         if df.empty:
-            QMessageBox.information(self, "Info", "Nenhum dado para os filtros selecionados.")
+            self._tree.clear()
+            self._status.setText("Nenhum dado para os filtros selecionados.")
             return
 
         row1     = self._row1.currentText()
@@ -1064,6 +1161,21 @@ class AbaPivot(QWidget):
             f"{len(grupos)} grupos  |  {len(df)} registros  |  agreg: {agg}"
             + ("  —  clique no ▶ para expandir" if use_row2 else ""))
 
+        # ── salvar configuração em config.json ────────────
+        cfg_save({"pivot_config": {
+            "row1":       self._row1.currentText(),
+            "row2":       self._row2.currentText(),
+            "cols":       self._cols.currentText(),
+            "agg":        self._agg.currentText(),
+            "subtotais":  self._chk_sub.isChecked(),
+            "total_geral": self._chk_total.isChecked(),
+            "f_ano":      self._f_ano.currentText(),
+            "f_mes":      self._f_mes.currentText(),
+            "f_cat":      self._f_cat.currentText(),
+            "f_tran":     self._f_tran.currentText(),
+            "f_sub":      self._f_sub.currentText(),
+        }})
+
     # ── exportar ──────────────────────────────────────────
     def _exportar(self):
         if not self._export_rows:
@@ -1135,7 +1247,7 @@ class MainWindow(QMainWindow):
 
     def _on_tab(self, idx):
         if idx == 2:
-            self._aba_pivot._atualizar_filtros()
+            self._aba_pivot._gerar()
 
 
 # ═══════════════════════════════════════════════════════════
