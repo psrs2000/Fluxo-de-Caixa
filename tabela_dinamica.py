@@ -233,8 +233,20 @@ def cor_valor(v) -> QColor:
         return COLOR_ZERO
 
 
+class NumericItem(QTableWidgetItem):
+    """Item que ordena pelo valor numérico armazenado em UserRole."""
+    def __lt__(self, other):
+        a = self.data(Qt.UserRole)
+        b = other.data(Qt.UserRole)
+        try:
+            return float(a) < float(b)
+        except (TypeError, ValueError):
+            return super().__lt__(other)
+
+
 def item_valor(v) -> QTableWidgetItem:
-    it = QTableWidgetItem(fmt_valor(v))
+    it = NumericItem(fmt_valor(v))
+    it.setData(Qt.UserRole, float(v) if v is not None else 0.0)
     it.setForeground(QBrush(cor_valor(v)))
     it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
     return it
@@ -545,8 +557,32 @@ class AbaForm(QWidget):
             i = self._table.rowCount()
             self._table.insertRow(i)
             for j, v in enumerate(r):
-                if j == 8:
-                    it = item_valor(v); it.setData(Qt.UserRole, v)
+                if j == 8:                          # Valor
+                    it = item_valor(v)
+                elif j in (0, 2, 3):               # id, Mês, Ano
+                    it = NumericItem(str(v) if v is not None else "")
+                    it.setData(Qt.UserRole, float(v) if v is not None else 0.0)
+                    it.setTextAlignment(Qt.AlignCenter)
+                elif j == 1:                        # Data — ordena por ISO
+                    it = NumericItem(str(v) if v is not None else "")
+                    mes, ano = _mes_ano(str(v)) if v else (0, 0)
+                    # converte para AAAAMMDD para ordenação correta
+                    try:
+                        import datetime as _dt
+                        for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M",
+                                    "%d/%m/%Y", "%Y-%m-%d %H:%M:%S",
+                                    "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+                            try:
+                                sort_key = float(
+                                    _dt.datetime.strptime(str(v).strip(), fmt)
+                                    .strftime("%Y%m%d%H%M%S"))
+                                break
+                            except ValueError:
+                                sort_key = 0.0
+                    except Exception:
+                        sort_key = 0.0
+                    it.setData(Qt.UserRole, sort_key)
+                    it.setTextAlignment(Qt.AlignCenter)
                 else:
                     it = QTableWidgetItem(str(v) if v is not None else "")
                     it.setTextAlignment(Qt.AlignCenter)
@@ -917,18 +953,6 @@ class AbaPivot(QWidget):
         self._f_sub  = QComboBox(); self._f_sub.setMinimumWidth(160)
         lay_flt.addWidget(self._f_sub, 1, 5)
         root.addWidget(grp_flt)
-
-        # ── botões ────────────────────────────────────────
-        btn_row = QHBoxLayout()
-        btn_gerar = _btn("▶  Gerar Tabela", "#4CAF50", self._gerar, 180)
-        btn_gerar.setStyleSheet(
-            "QPushButton{background:#4CAF50;color:white;border-radius:6px;"
-            "padding:10px 28px;font-weight:bold;font-size:14px;}"
-            "QPushButton:hover{background:#43A047;}"
-        )
-        btn_row.addWidget(btn_gerar)
-        btn_row.addStretch()
-        root.addLayout(btn_row)
 
         # ── resultado ─────────────────────────────────────
         self._tree = QTreeWidget()
