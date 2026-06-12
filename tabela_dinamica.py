@@ -996,10 +996,12 @@ class AbaPivot(QWidget):
         df = self._carregar_df()
         todos = ["(todos)"]
         if df is None or df.empty:
-            for cb in (self._f_ano, self._f_cat, self._f_tran, self._f_sub):
-                cb.clear(); cb.addItems(todos)
-            self._f_mes.clear()
-            self._f_mes.addItems(todos)
+            for cb in (self._f_ano, self._f_cat, self._f_tran, self._f_sub, self._f_mes):
+                cb.blockSignals(True)
+                cb.clear()
+                cb.addItems(todos)
+                cb.blockSignals(False)
+            self._tree.clear()
             return
         anos  = todos + sorted(df["Ano"].dropna().unique().astype(int).astype(str).tolist())
         cats  = todos + sorted(df["Categoria"].dropna().unique().tolist())
