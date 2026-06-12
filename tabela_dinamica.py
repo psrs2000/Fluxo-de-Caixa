@@ -344,6 +344,8 @@ class AbaForm(QWidget):
                 w.setCompleter(comp)
             else:
                 w = QLineEdit()
+                if key == "Descricao":
+                    w.setMinimumWidth(780)
             form.addWidget(w, row_idx, 1, Qt.AlignLeft)
             self._campos[key] = w
 
