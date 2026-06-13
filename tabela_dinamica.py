@@ -24,6 +24,7 @@ from PyQt5.QtWidgets import (
     QMessageBox, QTableWidget, QTableWidgetItem,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QSplitter,
     QAbstractItemView, QStatusBar, QFrame, QCompleter,
+    QMenu, QWidgetAction,
 )
 from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel, QStringListModel
 from PyQt5.QtGui import QColor, QBrush, QFont, QPalette
@@ -932,14 +933,22 @@ class AbaPivot(QWidget):
         lay_str.addWidget(lbl("Linha 1 (grupo):"),    0, 0, Qt.AlignRight)
         self._row1 = combo(ALL_DIM, "Categoria")
         lay_str.addWidget(self._row1, 0, 1)
+        self._btn_excl1 = QPushButton("Excluir itens ▼")
+        self._btn_excl1.setFixedWidth(130)
+        self._btn_excl1.clicked.connect(lambda: self._abrir_menu_exclusao(1))
+        lay_str.addWidget(self._btn_excl1, 0, 2)
 
-        lay_str.addWidget(lbl("Linha 2 (subgrupo):"), 0, 2, Qt.AlignRight)
+        lay_str.addWidget(lbl("Linha 2 (subgrupo):"), 0, 3, Qt.AlignRight)
         self._row2 = combo(["(nenhuma)"] + ALL_DIM, "Descricao")
-        lay_str.addWidget(self._row2, 0, 3)
+        lay_str.addWidget(self._row2, 0, 4)
+        self._btn_excl2 = QPushButton("Excluir itens ▼")
+        self._btn_excl2.setFixedWidth(130)
+        self._btn_excl2.clicked.connect(lambda: self._abrir_menu_exclusao(2))
+        lay_str.addWidget(self._btn_excl2, 0, 5)
 
-        lay_str.addWidget(lbl("Colunas:"),            0, 4, Qt.AlignRight)
+        lay_str.addWidget(lbl("Colunas:"),            0, 6, Qt.AlignRight)
         self._cols = combo(["(nenhuma)"] + ALL_DIM, "Mes")
-        lay_str.addWidget(self._cols, 0, 5)
+        lay_str.addWidget(self._cols, 0, 7)
 
         lay_str.addWidget(lbl("Agregar:"),            1, 0, Qt.AlignRight)
         self._agg = combo(["sum", "count", "mean", "min", "max"], "sum")
@@ -947,10 +956,14 @@ class AbaPivot(QWidget):
         lay_str.addWidget(self._agg, 1, 1)
 
         self._chk_sub = QCheckBox("Subtotais"); self._chk_sub.setChecked(True)
-        lay_str.addWidget(self._chk_sub, 1, 2, 1, 2)
+        lay_str.addWidget(self._chk_sub, 1, 3, 1, 2)
         self._chk_total = QCheckBox("Total Geral"); self._chk_total.setChecked(True)
-        lay_str.addWidget(self._chk_total, 1, 4, 1, 2)
+        lay_str.addWidget(self._chk_total, 1, 5, 1, 2)
         root.addWidget(grp_str)
+
+        # sets de exclusão (populados dinamicamente)
+        self._excluidos1 = set()
+        self._excluidos2 = set()
 
         # ── filtros ───────────────────────────────────────
         grp_flt = QGroupBox("Filtros de Relatório")
@@ -977,6 +990,20 @@ class AbaPivot(QWidget):
         self._f_sub  = QComboBox(); self._f_sub.setMinimumWidth(160)
         lay_flt.addWidget(self._f_sub, 1, 5)
         root.addWidget(grp_flt)
+
+        # ── botões expandir/recolher ──────────────────────
+        btn_tree_row = QHBoxLayout()
+        btn_exp = QPushButton("▼  Expandir Tudo")
+        btn_rec = QPushButton("▶  Recolher Tudo")
+        for b in (btn_exp, btn_rec):
+            b.setFixedHeight(28)
+            b.setFixedWidth(150)
+        btn_exp.clicked.connect(lambda: self._tree.expandAll())
+        btn_rec.clicked.connect(lambda: self._tree.collapseAll())
+        btn_tree_row.addWidget(btn_exp)
+        btn_tree_row.addWidget(btn_rec)
+        btn_tree_row.addStretch()
+        root.addLayout(btn_tree_row)
 
         # ── resultado ─────────────────────────────────────
         self._tree = QTreeWidget()
@@ -1069,9 +1096,55 @@ class AbaPivot(QWidget):
                 self._chk_sub.setChecked(bool(cfg["subtotais"]))
             if "total_geral" in cfg:
                 self._chk_total.setChecked(bool(cfg["total_geral"]))
+            if "excluidos1" in cfg:
+                self._excluidos1 = set(cfg["excluidos1"])
+            if "excluidos2" in cfg:
+                self._excluidos2 = set(cfg["excluidos2"])
         finally:
             for w in widgets:
                 w.blockSignals(False)
+
+    # ── menu de exclusão de itens ─────────────────────────
+    def _abrir_menu_exclusao(self, linha: int):
+        df = self._carregar_df()
+        if df is None or df.empty:
+            return
+        campo = self._row1.currentText() if linha == 1 else self._row2.currentText()
+        if campo == "(nenhuma)":
+            return
+        excluidos = self._excluidos1 if linha == 1 else self._excluidos2
+        btn      = self._btn_excl1  if linha == 1 else self._btn_excl2
+
+        itens = sorted(df[campo].dropna().unique().tolist(), key=str)
+
+        menu = QMenu(self)
+        menu.setStyleSheet("QMenu { padding:4px; } QCheckBox { padding:4px 8px; }")
+
+        for item in itens:
+            wa = QWidgetAction(menu)
+            chk = QCheckBox(str(item), menu)
+            chk.setChecked(str(item) in excluidos)
+            item_str = str(item)
+            def make_toggle(s, ex):
+                def toggle(checked):
+                    if checked: ex.add(s)
+                    else:        ex.discard(s)
+                    self._gerar()
+                return toggle
+            chk.toggled.connect(make_toggle(item_str, excluidos))
+            wa.setDefaultWidget(chk)
+            menu.addAction(wa)
+
+        menu.addSeparator()
+        act_clear = menu.addAction("Limpar exclusões")
+        act_clear.triggered.connect(lambda: self._limpar_exclusoes(linha))
+
+        menu.exec_(btn.mapToGlobal(btn.rect().bottomLeft()))
+
+    def _limpar_exclusoes(self, linha: int):
+        if linha == 1: self._excluidos1.clear()
+        else:          self._excluidos2.clear()
+        self._gerar()
 
     # ── gerar ─────────────────────────────────────────────
     def _gerar(self):
@@ -1095,6 +1168,14 @@ class AbaPivot(QWidget):
             df = df[df["Transacao"]     == self._f_tran.currentText()]
         if self._f_sub.currentText()  != "(todos)":
             df = df[df["Sub_Categoria"] == self._f_sub.currentText()]
+
+        # exclusões de itens de linha 1 e linha 2
+        row1_campo = self._row1.currentText()
+        row2_campo = self._row2.currentText()
+        if self._excluidos1 and row1_campo in df.columns:
+            df = df[~df[row1_campo].astype(str).isin(self._excluidos1)]
+        if self._excluidos2 and row2_campo in df.columns:
+            df = df[~df[row2_campo].astype(str).isin(self._excluidos2)]
 
         if df.empty:
             self._tree.clear()
@@ -1214,17 +1295,19 @@ class AbaPivot(QWidget):
 
         # ── salvar configuração em config.json ────────────
         cfg_save({"pivot_config": {
-            "row1":       self._row1.currentText(),
-            "row2":       self._row2.currentText(),
-            "cols":       self._cols.currentText(),
-            "agg":        self._agg.currentText(),
-            "subtotais":  self._chk_sub.isChecked(),
+            "row1":        self._row1.currentText(),
+            "row2":        self._row2.currentText(),
+            "cols":        self._cols.currentText(),
+            "agg":         self._agg.currentText(),
+            "subtotais":   self._chk_sub.isChecked(),
             "total_geral": self._chk_total.isChecked(),
-            "f_ano":      self._f_ano.currentText(),
-            "f_mes":      self._f_mes.currentText(),
-            "f_cat":      self._f_cat.currentText(),
-            "f_tran":     self._f_tran.currentText(),
-            "f_sub":      self._f_sub.currentText(),
+            "f_ano":       self._f_ano.currentText(),
+            "f_mes":       self._f_mes.currentText(),
+            "f_cat":       self._f_cat.currentText(),
+            "f_tran":      self._f_tran.currentText(),
+            "f_sub":       self._f_sub.currentText(),
+            "excluidos1":  list(self._excluidos1),
+            "excluidos2":  list(self._excluidos2),
         }})
 
     # ── exportar ──────────────────────────────────────────
