@@ -1382,8 +1382,17 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Tabela Dinâmica")
-        self.resize(1100, 720)
         self.setMinimumSize(800, 560)
+
+        # restaurar geometria salva
+        cfg = cfg_load().get("janela", {})
+        if cfg.get("maximizado"):
+            self.resize(cfg.get("largura", 1100), cfg.get("altura", 720))
+            self.showMaximized()
+        else:
+            self.resize(cfg.get("largura", 1100), cfg.get("altura", 720))
+            if "x" in cfg and "y" in cfg:
+                self.move(cfg["x"], cfg["y"])
 
         tabs = QTabWidget()
         tabs.setDocumentMode(True)
@@ -1400,6 +1409,19 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(tabs)
         self.statusBar().showMessage("Pronto")
+
+    def closeEvent(self, event):
+        maximizado = self.isMaximized()
+        if maximizado:
+            self.showNormal()  # para capturar tamanho restaurado
+        cfg_save({"janela": {
+            "maximizado": maximizado,
+            "largura":    self.width(),
+            "altura":     self.height(),
+            "x":          self.x(),
+            "y":          self.y(),
+        }})
+        event.accept()
 
     def _on_tab(self, idx):
         if idx == 2:
