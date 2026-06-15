@@ -992,6 +992,21 @@ class AbaPivot(QWidget):
         lay_flt.addWidget(lbl("Sub-Categoria:"), 1, 4, Qt.AlignRight)
         self._f_sub  = QComboBox(); self._f_sub.setMinimumWidth(160)
         lay_flt.addWidget(self._f_sub, 1, 5)
+
+        # radio buttons: todos / somente positivos / somente negativos
+        lay_flt.addWidget(lbl("Valores:"), 2, 0, Qt.AlignRight)
+        self._rb_todos = QRadioButton("Todos");          self._rb_todos.setChecked(True)
+        self._rb_pos   = QRadioButton("Somente positivos")
+        self._rb_neg   = QRadioButton("Somente negativos")
+        self._rb_grp   = QButtonGroup(self)
+        for rb in (self._rb_todos, self._rb_pos, self._rb_neg):
+            self._rb_grp.addButton(rb)
+        rb_row = QHBoxLayout()
+        rb_row.setSpacing(16)
+        for rb in (self._rb_todos, self._rb_pos, self._rb_neg):
+            rb_row.addWidget(rb)
+        rb_row.addStretch()
+        lay_flt.addLayout(rb_row, 2, 1, 1, 5)
         root.addWidget(grp_flt)
 
         # ── botões expandir/recolher ──────────────────────
@@ -1028,6 +1043,8 @@ class AbaPivot(QWidget):
             cb.currentIndexChanged.connect(self._gerar)
         for chk in (self._chk_sub, self._chk_total, self._chk_pct):
             chk.stateChanged.connect(self._gerar)
+        for rb in (self._rb_todos, self._rb_pos, self._rb_neg):
+            rb.toggled.connect(self._gerar)
 
         self._tree.itemExpanded.connect(
             lambda item: self._on_expansao(item, True))
@@ -1085,7 +1102,8 @@ class AbaPivot(QWidget):
         # block signals during restore to avoid multiple _gerar calls
         widgets = [self._row1, self._row2, self._cols, self._agg,
                    self._f_ano, self._f_mes, self._f_cat, self._f_tran, self._f_sub,
-                   self._chk_sub, self._chk_total, self._chk_pct]
+                   self._chk_sub, self._chk_total, self._chk_pct,
+                   self._rb_todos, self._rb_pos, self._rb_neg]
         for w in widgets:
             w.blockSignals(True)
         try:
@@ -1106,6 +1124,10 @@ class AbaPivot(QWidget):
                 self._chk_total.setChecked(bool(cfg["total_geral"]))
             if "mostrar_pct" in cfg:
                 self._chk_pct.setChecked(bool(cfg["mostrar_pct"]))
+            fv = cfg.get("filtro_valor", "todos")
+            if fv == "pos":  self._rb_pos.setChecked(True)
+            elif fv == "neg": self._rb_neg.setChecked(True)
+            else:             self._rb_todos.setChecked(True)
             if "excluidos1" in cfg:
                 self._excluidos1 = set(cfg["excluidos1"])
             if "excluidos2" in cfg:
@@ -1200,6 +1222,12 @@ class AbaPivot(QWidget):
             df = df[~df[row1_campo].astype(str).isin(self._excluidos1)]
         if self._excluidos2 and row2_campo in df.columns:
             df = df[~df[row2_campo].astype(str).isin(self._excluidos2)]
+
+        # filtro positivos / negativos
+        if self._rb_pos.isChecked():
+            df = df[df["Valor"] > 0]
+        elif self._rb_neg.isChecked():
+            df = df[df["Valor"] < 0]
 
         if df.empty:
             self._tree.clear()
@@ -1349,6 +1377,7 @@ class AbaPivot(QWidget):
             "subtotais":   self._chk_sub.isChecked(),
             "total_geral": self._chk_total.isChecked(),
             "mostrar_pct": self._chk_pct.isChecked(),
+            "filtro_valor": "pos" if self._rb_pos.isChecked() else "neg" if self._rb_neg.isChecked() else "todos",
             "f_ano":       self._f_ano.currentText(),
             "f_mes":       self._f_mes.currentText(),
             "f_cat":       self._f_cat.currentText(),
