@@ -1527,6 +1527,17 @@ class AbaPivot(QWidget):
 # ═══════════════════════════════════════════════════════════
 
 class AbaDashboard(QWidget):
+
+    DIMS = {
+        "Categoria":     "Categoria",
+        "Sub-Categoria": "Sub_Categoria",
+        "Transação":     "Transacao",
+        "Descrição":     "Descricao",
+        "Mês":           "Mes",
+        "Ano":           "Ano",
+    }
+    DEFAULTS = ["Categoria", "Sub-Categoria", "Mês"]
+
     def __init__(self):
         super().__init__()
         self._build()
@@ -1536,15 +1547,15 @@ class AbaDashboard(QWidget):
         root.setContentsMargins(14, 10, 14, 10)
         root.setSpacing(10)
 
-        # ── filtros ───────────────────────────────────────
+        # ── filtros globais ───────────────────────────────
         flt = QHBoxLayout()
         flt.addWidget(QLabel("Ano:"))
         self._f_ano = QComboBox(); self._f_ano.setFixedWidth(90)
-        self._f_ano.currentIndexChanged.connect(self._on_filtro)
+        self._f_ano.currentIndexChanged.connect(self._preencher)
         flt.addWidget(self._f_ano)
         flt.addWidget(QLabel("  Mês:"))
         self._f_mes = QComboBox(); self._f_mes.setMinimumWidth(150)
-        self._f_mes.currentIndexChanged.connect(self._on_filtro)
+        self._f_mes.currentIndexChanged.connect(self._preencher)
         flt.addWidget(self._f_mes)
         flt.addStretch()
         root.addLayout(flt)
@@ -1552,69 +1563,59 @@ class AbaDashboard(QWidget):
         # ── cartões de resumo ─────────────────────────────
         cards_row = QHBoxLayout()
         cards_row.setSpacing(14)
-        self._card_ent  = self._make_card("Total Entradas", "#1b5e20")
-        self._card_sai  = self._make_card("Total Saídas",   "#c62828")
-        self._card_sal  = self._make_card("Saldo",          "#1565C0")
-        self._card_qtd  = self._make_card("Registros",      "#6A1B9A")
+        self._card_ent = self._make_card("Total Entradas", "#1b5e20")
+        self._card_sai = self._make_card("Total Saídas",   "#c62828")
+        self._card_sal = self._make_card("Saldo",          "#1565C0")
+        self._card_qtd = self._make_card("Registros",      "#6A1B9A")
         for c in (self._card_ent, self._card_sai, self._card_sal, self._card_qtd):
             cards_row.addWidget(c)
         root.addLayout(cards_row)
 
-        # ── tabelas lado a lado ───────────────────────────
+        # ── 3 tabelas configuráveis ───────────────────────
         tabelas_row = QHBoxLayout()
         tabelas_row.setSpacing(14)
-
-        # top categorias
-        grp_cat = QGroupBox("Top Categorias (por saída)")
-        lay_cat = QVBoxLayout(grp_cat)
-        self._tbl_cat = self._make_table(["Categoria", "Total", "%"])
-        lay_cat.addWidget(self._tbl_cat)
-        tabelas_row.addWidget(grp_cat)
-
-        # top descrições
-        grp_desc = QGroupBox("Top Descrições (por saída)")
-        lay_desc = QVBoxLayout(grp_desc)
-        self._tbl_desc = self._make_table(["Descrição", "Total", "%"])
-        lay_desc.addWidget(self._tbl_desc)
-        tabelas_row.addWidget(grp_desc)
-
-        # top meses
-        grp_mes = QGroupBox("Resumo por Mês")
-        lay_mes = QVBoxLayout(grp_mes)
-        self._tbl_mes = self._make_table(["Mês", "Entradas", "Saídas", "Saldo"])
-        lay_mes.addWidget(self._tbl_mes)
-        tabelas_row.addWidget(grp_mes)
-
+        self._paineis = []
+        for i, default in enumerate(self.DEFAULTS):
+            grp = QGroupBox()
+            lay = QVBoxLayout(grp)
+            lay.setSpacing(4)
+            cb = QComboBox()
+            cb.addItems(list(self.DIMS.keys()))
+            cb.setCurrentText(default)
+            cb.currentIndexChanged.connect(self._preencher)
+            lay.addWidget(cb)
+            tbl = self._make_table()
+            lay.addWidget(tbl)
+            tabelas_row.addWidget(grp)
+            self._paineis.append((grp, cb, tbl))
         root.addLayout(tabelas_row, 1)
 
         # ── maior gasto único ─────────────────────────────
         self._lbl_maior = QLabel("")
-        self._lbl_maior.setStyleSheet(
-            "font-size:12px; color:#555; padding:4px;")
+        self._lbl_maior.setStyleSheet("font-size:12px; color:#555; padding:4px;")
         root.addWidget(self._lbl_maior)
 
     def _make_card(self, titulo, cor):
         frame = QFrame()
         frame.setFrameShape(QFrame.StyledPanel)
         frame.setStyleSheet(
-            f"QFrame{{background:#f5f5f5; border:2px solid {cor}; border-radius:8px;}}")
+            f"QFrame{{background:#f5f5f5;border:2px solid {cor};border-radius:8px;}}")
         lay = QVBoxLayout(frame)
         lay.setContentsMargins(16, 10, 16, 10)
-        lbl_titulo = QLabel(titulo)
-        lbl_titulo.setStyleSheet(
-            f"font-size:11px; font-weight:bold; color:{cor}; border:none;")
-        lbl_valor = QLabel("—")
-        lbl_valor.setStyleSheet(
-            f"font-size:20px; font-weight:bold; color:{cor}; border:none;")
-        lbl_valor.setAlignment(Qt.AlignCenter)
-        lay.addWidget(lbl_titulo)
-        lay.addWidget(lbl_valor)
-        frame._lbl = lbl_valor
+        lbl_t = QLabel(titulo)
+        lbl_t.setStyleSheet(f"font-size:11px;font-weight:bold;color:{cor};border:none;")
+        lbl_v = QLabel("—")
+        lbl_v.setStyleSheet(f"font-size:20px;font-weight:bold;color:{cor};border:none;")
+        lbl_v.setAlignment(Qt.AlignCenter)
+        lay.addWidget(lbl_t)
+        lay.addWidget(lbl_v)
+        frame._lbl = lbl_v
+        frame._cor = cor
         return frame
 
-    def _make_table(self, cols):
-        t = QTableWidget(0, len(cols))
-        t.setHorizontalHeaderLabels(cols)
+    def _make_table(self):
+        t = QTableWidget(0, 4)
+        t.setHorizontalHeaderLabels(["", "Entradas", "Saídas", "Saldo"])
         t.setEditTriggers(QAbstractItemView.NoEditTriggers)
         t.setSelectionBehavior(QAbstractItemView.SelectRows)
         t.verticalHeader().setVisible(False)
@@ -1623,11 +1624,7 @@ class AbaDashboard(QWidget):
         t.setFont(QFont("Segoe UI", 10))
         return t
 
-    def _on_filtro(self):
-        self._preencher()
-
     def atualizar(self):
-        """Chamado ao entrar na aba — recarrega filtros e dados."""
         if not PANDAS_OK:
             return
         cols, rows = buscar_todos()
@@ -1637,7 +1634,6 @@ class AbaDashboard(QWidget):
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
         df["Mes"]   = pd.to_numeric(df["Mes"],   errors="coerce")
         df["Ano"]   = pd.to_numeric(df["Ano"],   errors="coerce")
-        # excluir dummy
         df = df[df["Ano"] != 1900]
         self._df_full = df
 
@@ -1665,37 +1661,29 @@ class AbaDashboard(QWidget):
         entradas = df[df["Valor"] > 0]["Valor"].sum()
         saidas   = df[df["Valor"] < 0]["Valor"].sum()
         saldo    = entradas + saidas
-        qtd      = len(df)
 
         self._card_ent._lbl.setText(fmt_valor(entradas))
         self._card_sai._lbl.setText(fmt_valor(saidas))
-        self._card_sal._lbl.setText(fmt_valor(saldo))
-        # mudar cor do saldo dinamicamente
+        self._card_qtd._lbl.setText(str(len(df)))
+
         cor_sal = "#1b5e20" if saldo >= 0 else "#c62828"
         self._card_sal.setStyleSheet(
             f"QFrame{{background:#f5f5f5;border:2px solid {cor_sal};border-radius:8px;}}")
         self._card_sal._lbl.setStyleSheet(
             f"font-size:20px;font-weight:bold;color:{cor_sal};border:none;")
-        self._card_qtd._lbl.setText(str(qtd))
+        self._card_sal._lbl.setText(fmt_valor(saldo))
 
-        total_abs = abs(saidas) if saidas != 0 else 1.0
-
-        # top categorias (saídas)
-        df_sai = df[df["Valor"] < 0]
-        cat_grp = df_sai.groupby("Categoria")["Valor"].sum().sort_values()
-        self._fill_table(self._tbl_cat, cat_grp, total_abs)
-
-        # top descrições (saídas)
-        desc_grp = df_sai.groupby("Descricao")["Valor"].sum().sort_values().head(15)
-        self._fill_table(self._tbl_desc, desc_grp, total_abs)
-
-        # resumo por mês
-        self._fill_mes(df)
+        # preencher cada painel com a dimensão escolhida
+        for grp, cb, tbl in self._paineis:
+            dim_nome = cb.currentText()
+            dim_col  = self.DIMS[dim_nome]
+            grp.setTitle(dim_nome)
+            self._fill_dim(tbl, df, dim_col, dim_nome)
 
         # maior gasto único
+        df_sai = df[df["Valor"] < 0]
         if not df_sai.empty:
-            idx_min = df_sai["Valor"].idxmin()
-            row = df_sai.loc[idx_min]
+            row = df_sai.loc[df_sai["Valor"].idxmin()]
             self._lbl_maior.setText(
                 f"  Maior gasto único:  {row['Data']}  |  "
                 f"{row['Categoria']}  |  {row['Descricao']}  |  "
@@ -1703,40 +1691,38 @@ class AbaDashboard(QWidget):
         else:
             self._lbl_maior.setText("")
 
-    def _fill_table(self, tbl, serie, total_abs):
+    def _fill_dim(self, tbl, df, col, dim_nome):
+        tbl.setHorizontalHeaderLabels([dim_nome, "Entradas", "Saídas", "Saldo"])
         tbl.setRowCount(0)
-        for nome, val in serie.items():
-            if not nome:
-                continue
-            r = tbl.rowCount(); tbl.insertRow(r)
-            tbl.setItem(r, 0, QTableWidgetItem(str(nome)))
-            it_val = QTableWidgetItem(fmt_valor(val))
-            it_val.setForeground(QBrush(cor_valor(val)))
-            it_val.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            tbl.setItem(r, 1, it_val)
-            pct = abs(val) / total_abs * 100
-            it_pct = QTableWidgetItem(f"{pct:.1f}%")
-            it_pct.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            tbl.setItem(r, 2, it_pct)
-        tbl.resizeColumnsToContents()
 
-    def _fill_mes(self, df):
-        self._tbl_mes.setRowCount(0)
-        for mes in range(1, 13):
-            dm = df[df["Mes"] == mes]
-            if dm.empty:
+        if col == "Mes":
+            # ordenar por número do mês
+            chaves = sorted(df[col].dropna().unique(), key=lambda x: int(x))
+        else:
+            chaves = sorted(df[col].dropna().unique(), key=str)
+
+        for chave in chaves:
+            if str(chave).strip() == "":
                 continue
+            dm  = df[df[col] == chave]
             ent = dm[dm["Valor"] > 0]["Valor"].sum()
             sai = dm[dm["Valor"] < 0]["Valor"].sum()
             sal = ent + sai
-            r = self._tbl_mes.rowCount(); self._tbl_mes.insertRow(r)
-            self._tbl_mes.setItem(r, 0, QTableWidgetItem(f"{mes} – {NOMES_MESES[mes]}"))
+
+            if col == "Mes":
+                label = f"{int(chave)} – {NOMES_MESES.get(int(chave), '')}"
+            else:
+                label = str(chave)
+
+            r = tbl.rowCount(); tbl.insertRow(r)
+            tbl.setItem(r, 0, QTableWidgetItem(label))
             for c, v in enumerate([ent, sai, sal], 1):
                 it = QTableWidgetItem(fmt_valor(v))
                 it.setForeground(QBrush(cor_valor(v)))
                 it.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                self._tbl_mes.setItem(r, c, it)
-        self._tbl_mes.resizeColumnsToContents()
+                tbl.setItem(r, c, it)
+        tbl.resizeColumnsToContents()
+
 
 
 class MainWindow(QMainWindow):
