@@ -1304,11 +1304,11 @@ class AbaPivot(QWidget):
         n = self._tree.topLevelItemCount()
         if n == 0:
             return
-        # separar Total Geral dos demais
+        # retirar todos os itens sem destruí-los
         items = []
         total_item = None
-        for i in range(n):
-            item = self._tree.topLevelItem(i)
+        while self._tree.topLevelItemCount() > 0:
+            item = self._tree.takeTopLevelItem(0)
             if item.text(0) == "Total Geral":
                 total_item = item
             else:
@@ -1318,15 +1318,12 @@ class AbaPivot(QWidget):
             txt = item.text(col)
             if alfa:
                 return txt.lower()
-            # extrair número do texto (R$ -1.234,56  ou  12,34%)
             num = txt.replace("R$", "").replace("%", "").replace(".", "").replace(",", ".").strip()
             try:    return float(num)
             except: return 0.0
 
         items.sort(key=chave, reverse=not self._sort_asc)
 
-        # retirar todos e reinserir na nova ordem
-        self._tree.clear()
         for item in items:
             self._tree.addTopLevelItem(item)
             item.setExpanded(item.text(0) in self._expandidos)
