@@ -1324,10 +1324,10 @@ class AbaPivot(QWidget):
             txt = item.text(col)
             if alfa:
                 return txt.lower()
-            num = txt.replace("R$", "").replace("%", "").replace(".", "").replace(",", ".").strip()
+            # extrai apenas dígitos, sinal e separador decimal
+            num = re.sub(r"[R$\s%\.]", "", txt).replace(",", ".")
             try:    return float(num)
             except: return 0.0
-
         items.sort(key=chave, reverse=not self._sort_asc)
 
         for item in items:
