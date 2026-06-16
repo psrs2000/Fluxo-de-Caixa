@@ -419,6 +419,17 @@ class AbaForm(QWidget):
         self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._table.setAlternatingRowColors(True)
         self._table.verticalHeader().setVisible(False)
+        # manter destaque da seleção mesmo quando a tabela não tem foco
+        self._table.setStyleSheet("""
+            QTableWidget::item:selected {
+                background-color: #1976D2;
+                color: white;
+            }
+            QTableWidget::item:selected:!active {
+                background-color: #1976D2;
+                color: white;
+            }
+        """)
         hdr = self._table.horizontalHeader()
         hdr.setSectionResizeMode(QHeaderView.Interactive)
         hdr.setStretchLastSection(False)
