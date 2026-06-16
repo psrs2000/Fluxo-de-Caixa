@@ -309,6 +309,7 @@ class AbaForm(QWidget):
         super().__init__()
         self._edit_id  = None
         self._all_rows = []   # cache completo para filtro local
+        self._dirty    = set()  # campos modificados pelo usuário desde última seleção
         self._build()
 
     # ── construção ────────────────────────────────────────
@@ -355,15 +356,25 @@ class AbaForm(QWidget):
         self._btn_salvar  = _btn("Salvar",             "#4CAF50", self._salvar,  140)
         self._btn_limpar  = _btn("Limpar",             "#2196F3", self._limpar,  140)
         self._btn_excluir = _btn("Excluir Selecionado","#f44336", self._excluir, 180)
-        for b in (self._btn_salvar, self._btn_limpar, self._btn_excluir):
+        self._btn_lote    = _btn("Aplicar a Selecionados", "#E65100", self._aplicar_lote, 200)
+        for b in (self._btn_salvar, self._btn_limpar, self._btn_excluir, self._btn_lote):
             b.setStyleSheet(b.styleSheet().replace("padding:6px 18px", "padding:10px 28px")
                                           .replace("font-size:12px", "font-size:14px"))
+        self._btn_lote.setVisible(False)
         btn_row.addWidget(self._btn_salvar)
         btn_row.addWidget(self._btn_limpar)
         btn_row.addWidget(self._btn_excluir)
+        btn_row.addWidget(self._btn_lote)
         btn_row.addStretch()
         form.addLayout(btn_row, len(specs), 0, 1, 2)
         root.addWidget(grp)
+
+        # conectar dirty tracking em todos os campos
+        for key, w in self._campos.items():
+            if isinstance(w, QComboBox):
+                w.currentTextChanged.connect(lambda _, k=key: self._marcar_dirty(k))
+            else:
+                w.textChanged.connect(lambda _, k=key: self._marcar_dirty(k))
 
         # ── barra de filtros ──────────────────────────────
         flt_grp = QGroupBox("Filtros / Pesquisa")
@@ -509,10 +520,15 @@ class AbaForm(QWidget):
         self._carregar()
 
     def _limpar(self):
+        self._carregando_selecao = True
         for key in self._campos:
             self._clear_field(key)
+        self._carregando_selecao = False
         self._edit_id = None
+        self._dirty.clear()
         self._btn_salvar.setText("Salvar")
+        self._btn_salvar.setVisible(True)
+        self._btn_lote.setVisible(False)
 
     def _excluir(self):
         sel = self._table.selectionModel().selectedRows()
@@ -530,10 +546,24 @@ class AbaForm(QWidget):
             self._limpar()
             self._carregar()
 
+    def _marcar_dirty(self, key):
+        # ignora mudanças causadas programaticamente durante _on_select
+        if getattr(self, "_carregando_selecao", False):
+            return
+        self._dirty.add(key)
+
     def _on_select(self):
         sel = self._table.selectionModel().selectedRows()
         if not sel:
+            self._btn_lote.setVisible(False)
             return
+        multi = len(sel) > 1
+        self._btn_lote.setVisible(multi)
+        self._btn_salvar.setVisible(not multi)
+
+        # carrega dados da primeira linha selecionada no formulário
+        self._carregando_selecao = True
+        self._dirty.clear()
         r = sel[0].row()
         self._edit_id = int(self._table.item(r, 0).text())
         self._set_text("Data",          self._table.item(r, 1).text())
@@ -543,7 +573,54 @@ class AbaForm(QWidget):
         self._set_text("Descricao",     self._table.item(r, 7).text())
         raw = self._table.item(r, 8).data(Qt.UserRole)
         self._set_text("Valor", str(raw) if raw is not None else "")
-        self._btn_salvar.setText("Atualizar")
+        self._carregando_selecao = False
+        self._btn_salvar.setText("Atualizar" if not multi else "Salvar")
+
+    def _aplicar_lote(self):
+        sel = self._table.selectionModel().selectedRows()
+        if not sel or not self._dirty:
+            QMessageBox.information(self, "Info",
+                "Altere pelo menos um campo antes de aplicar.")
+            return
+        rids   = [int(self._table.item(idx.row(), 0).text()) for idx in sel]
+        campos = sorted(self._dirty)
+        nomes  = {"Data": "Data", "Categoria": "Categoria",
+                  "Sub_Categoria": "Sub-Categoria", "Transacao": "Transação",
+                  "Descricao": "Descrição", "Valor": "Valor"}
+        lista  = ", ".join(nomes.get(c, c) for c in campos)
+        msg    = (f"Atualizar o(s) campo(s)  【{lista}】\n"
+                  f"em {len(rids)} registros selecionados?")
+        if QMessageBox.question(self, "Confirmar edição em lote", msg,
+                                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        # busca registro completo e substitui apenas os campos dirty
+        con = sqlite3.connect(DB_PATH)
+        for rid in rids:
+            cur = con.execute(
+                "SELECT Data,Categoria,Sub_Categoria,Transacao,Descricao,Valor"
+                " FROM registros WHERE id=?", (rid,))
+            row_db = cur.fetchone()
+            if not row_db:
+                continue
+            row = dict(zip(
+                ["Data","Categoria","Sub_Categoria","Transacao","Descricao","Valor"],
+                row_db))
+            for campo in campos:
+                row[campo] = self._get_text(campo)
+            mes, ano = _mes_ano(row["Data"])
+            try:
+                valor = float(row["Valor"] or 0)
+            except ValueError:
+                valor = 0.0
+            con.execute(
+                "UPDATE registros SET Data=?,Mes=?,Ano=?,Categoria=?,Sub_Categoria=?,"
+                "Transacao=?,Descricao=?,Valor=? WHERE id=?",
+                (row["Data"], mes, ano, row["Categoria"], row["Sub_Categoria"],
+                 row["Transacao"], row["Descricao"], valor, rid))
+        con.commit()
+        con.close()
+        self._dirty.clear()
+        self._carregar()
 
     # ── filtros ───────────────────────────────────────────
     def _limpar_filtros(self):
