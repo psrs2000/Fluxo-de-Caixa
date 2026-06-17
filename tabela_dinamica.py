@@ -144,14 +144,16 @@ def _parse_valor(raw) -> float:
 def inserir(row: dict):
     mes, ano = _mes_ano(row.get("Data", ""))
     con = sqlite3.connect(DB_PATH)
-    con.execute(
+    cur = con.execute(
         "INSERT INTO registros (Data,Mes,Ano,Categoria,Sub_Categoria,Transacao,Descricao,Valor)"
         " VALUES (?,?,?,?,?,?,?,?)",
         (row["Data"], mes, ano, row["Categoria"], row["Sub_Categoria"],
          row["Transacao"], row["Descricao"], float(row["Valor"] or 0))
     )
+    new_id = cur.lastrowid
     con.commit()
     con.close()
+    return new_id
 
 
 def atualizar(rid, row: dict):
@@ -334,6 +336,7 @@ class AbaForm(QWidget):
         self._edit_id  = None
         self._all_rows = []   # cache completo para filtro local
         self._dirty    = set()  # campos modificados pelo usuário desde última seleção
+        self._auto_ajuste_feito = False  # auto-ajuste de colunas só na 1ª carga
         self._build()
 
     # ── construção ────────────────────────────────────────
@@ -544,16 +547,72 @@ class AbaForm(QWidget):
                 "Formato de data inválido.\nUse dd/mm/aaaa ou dd/mm/aaaa hh:mm:ss")
             return
         try:
-            float(row["Valor"] or 0)
+            valor = float(row["Valor"] or 0)
         except ValueError:
             QMessageBox.warning(self, "Atenção", "Valor deve ser numérico.")
             return
-        if self._edit_id:
-            atualizar(self._edit_id, row)
+        edit_id = self._edit_id
+        if edit_id:
+            atualizar(edit_id, row)
+            nova = (edit_id, row["Data"], mes, ano, row["Categoria"],
+                    row["Sub_Categoria"], row["Transacao"], row["Descricao"], valor)
+            self._all_rows = [nova if r[0] == edit_id else r
+                              for r in self._all_rows]
         else:
-            inserir(row)
+            new_id = inserir(row)
+            nova = (new_id, row["Data"], mes, ano, row["Categoria"],
+                    row["Sub_Categoria"], row["Transacao"], row["Descricao"], valor)
+            self._all_rows.append(nova)
+        # combos do formulário e dos filtros (cálculo barato)
+        self._atualizar_combos()
+        self._atualizar_filtros_combo()
+        # atualização incremental da tabela (só a linha afetada)
+        if edit_id:
+            self._editar_linha_tabela(edit_id, nova)
+        else:
+            self._inserir_linha_tabela(nova)
         self._limpar()
-        self._carregar()
+
+    def _linha_por_id(self, rid):
+        """Índice da linha na tabela cujo id (coluna 0) == rid, ou -1."""
+        for i in range(self._table.rowCount()):
+            it = self._table.item(i, 0)
+            if it and it.text() == str(rid):
+                return i
+        return -1
+
+    def _reordenar_tabela(self):
+        hdr = self._table.horizontalHeader()
+        self._table.sortItems(hdr.sortIndicatorSection(), hdr.sortIndicatorOrder())
+
+    def _inserir_linha_tabela(self, r):
+        """Adiciona uma única linha nova à tabela (se passar no filtro)."""
+        if self._passa_filtro(r):
+            self._table.setSortingEnabled(False)
+            i = self._table.rowCount()
+            self._table.insertRow(i)
+            self._montar_item_linha(i, r)
+            self._table.setSortingEnabled(True)
+            self._reordenar_tabela()
+        self._atualizar_soma_status()
+
+    def _editar_linha_tabela(self, rid, r):
+        """Atualiza in-place a linha editada (ou insere/remove se mudou o filtro)."""
+        i = self._linha_por_id(rid)
+        passa = self._passa_filtro(r)
+        self._table.setSortingEnabled(False)
+        if i >= 0 and passa:
+            self._montar_item_linha(i, r)        # atualiza só essa linha
+        elif i >= 0 and not passa:
+            self._table.removeRow(i)             # saiu do filtro
+        elif i < 0 and passa:
+            j = self._table.rowCount()
+            self._table.insertRow(j)
+            self._montar_item_linha(j, r)        # entrou no filtro
+        self._table.setSortingEnabled(True)
+        if passa:
+            self._reordenar_tabela()
+        self._atualizar_soma_status()
 
     def _limpar(self):
         self._carregando_selecao = True
@@ -581,10 +640,26 @@ class AbaForm(QWidget):
         if QMessageBox.question(self, "Confirmar", msg,
                                 QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
             rids = [int(self._table.item(idx.row(), 0).text()) for idx in sel]
+            linhas = sorted((idx.row() for idx in sel), reverse=True)
             for rid in rids:
                 deletar(rid)
+            rids_set = set(rids)
+            self._all_rows = [r for r in self._all_rows if r[0] not in rids_set]
+            # se o banco ficou vazio, deletar() reinsere o registro dummy:
+            # nesse caso faz uma recarga completa para refleti-lo
+            if not self._all_rows:
+                self._limpar()
+                self._carregar()
+                return
+            # remoção incremental das linhas selecionadas (de baixo p/ cima)
+            self._table.setSortingEnabled(False)
+            for r in linhas:
+                self._table.removeRow(r)
+            self._table.setSortingEnabled(True)
+            self._atualizar_combos()
+            self._atualizar_filtros_combo()
+            self._atualizar_soma_status()
             self._limpar()
-            self._carregar()
 
     def _marcar_dirty(self, key):
         # ignora mudanças causadas programaticamente durante _on_select
@@ -696,7 +771,8 @@ class AbaForm(QWidget):
         self._flt_mes.blockSignals(False)
         self._aplicar_filtro()
 
-    def _aplicar_filtro(self):
+    def _criterios_filtro(self):
+        """Retorna os critérios de filtro atuais como tupla, para reuso."""
         f_data = self._flt_widgets["data"].text().lower()
         f_cat  = self._flt_widgets["cat"].text().lower()
         f_sub  = self._flt_widgets["sub"].text().lower()
@@ -706,71 +782,70 @@ class AbaForm(QWidget):
         f_mes  = self._flt_mes.currentText()
         num_mes = int(f_mes.split(" – ")[0]) if f_mes != "(todos)" and " – " in f_mes else None
         num_ano = int(f_ano) if f_ano not in ("", "(todos)") else None
+        return (f_data, f_cat, f_sub, f_tran, f_desc, num_ano, num_mes)
 
-        self._table.setSortingEnabled(False)
-        self._table.setRowCount(0)
+    def _passa_filtro(self, r, crit=None):
+        """True se a linha r passa nos filtros atuais."""
+        f_data, f_cat, f_sub, f_tran, f_desc, num_ano, num_mes = \
+            crit if crit is not None else self._criterios_filtro()
+        if f_data and f_data not in str(r[1]).lower(): return False
+        if f_cat  and f_cat  not in str(r[4]).lower(): return False
+        if f_sub  and f_sub  not in str(r[5]).lower(): return False
+        if f_tran and f_tran not in str(r[6]).lower(): return False
+        if f_desc and f_desc not in str(r[7]).lower(): return False
+        if num_ano is not None and r[3] != num_ano:    return False
+        if num_mes is not None and r[2] != num_mes:    return False
+        return True
+
+    def _montar_item_linha(self, i, r):
+        """Cria e posiciona os 9 itens da linha i da tabela a partir de r."""
+        for j, v in enumerate(r):
+            if j == 8:                          # Valor
+                it = item_valor(v)
+            elif j in (0, 2, 3):               # id, Mês, Ano
+                it = NumericItem(str(v) if v is not None else "")
+                it.setData(Qt.UserRole, float(v) if v is not None else 0.0)
+                it.setTextAlignment(Qt.AlignCenter)
+            elif j == 1:                        # Data — ordena por ISO
+                it = NumericItem(str(v) if v is not None else "")
+                d = _parse_data(str(v)) if v else None
+                sort_key = float(d.strftime("%Y%m%d%H%M%S")) if d else 0.0
+                it.setData(Qt.UserRole, sort_key)
+                it.setTextAlignment(Qt.AlignCenter)
+            else:
+                it = QTableWidgetItem(str(v) if v is not None else "")
+                it.setTextAlignment(Qt.AlignCenter)
+            self._table.setItem(i, j, it)
+
+    def _atualizar_soma_status(self):
+        """Recalcula a soma (cabeçalho Valor) e o status, sobre as linhas visíveis."""
+        crit = self._criterios_filtro()
         soma = 0.0
         vis = 0
         for r in self._all_rows:
-            # r = (id, Data, Mes, Ano, Categoria, Sub_Categoria, Transacao, Descricao, Valor)
-            if f_data and f_data not in str(r[1]).lower(): continue
-            if f_cat  and f_cat  not in str(r[4]).lower(): continue
-            if f_sub  and f_sub  not in str(r[5]).lower(): continue
-            if f_tran and f_tran not in str(r[6]).lower(): continue
-            if f_desc and f_desc not in str(r[7]).lower(): continue
-            if num_ano is not None and r[3] != num_ano:    continue
-            if num_mes is not None and r[2] != num_mes:    continue
-            i = self._table.rowCount()
-            self._table.insertRow(i)
-            for j, v in enumerate(r):
-                if j == 8:                          # Valor
-                    it = item_valor(v)
-                elif j in (0, 2, 3):               # id, Mês, Ano
-                    it = NumericItem(str(v) if v is not None else "")
-                    it.setData(Qt.UserRole, float(v) if v is not None else 0.0)
-                    it.setTextAlignment(Qt.AlignCenter)
-                elif j == 1:                        # Data — ordena por ISO
-                    it = NumericItem(str(v) if v is not None else "")
-                    mes, ano = _mes_ano(str(v)) if v else (0, 0)
-                    # converte para AAAAMMDD para ordenação correta
-                    try:
-                        import datetime as _dt
-                        for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M",
-                                    "%d/%m/%Y", "%Y-%m-%d %H:%M:%S",
-                                    "%Y-%m-%d %H:%M", "%Y-%m-%d"):
-                            try:
-                                sort_key = float(
-                                    _dt.datetime.strptime(str(v).strip(), fmt)
-                                    .strftime("%Y%m%d%H%M%S"))
-                                break
-                            except ValueError:
-                                sort_key = 0.0
-                    except Exception:
-                        sort_key = 0.0
-                    it.setData(Qt.UserRole, sort_key)
-                    it.setTextAlignment(Qt.AlignCenter)
-                else:
-                    it = QTableWidgetItem(str(v) if v is not None else "")
-                    it.setTextAlignment(Qt.AlignCenter)
-                self._table.setItem(i, j, it)
-            soma += float(r[8] or 0)
-            vis += 1
-        self._table.setSortingEnabled(True)
-        # atualiza cabeçalho da coluna Valor com a soma ANTES do resize
+            if self._passa_filtro(r, crit):
+                soma += float(r[8] or 0)
+                vis += 1
         cor_hex = "#c62828" if soma < 0 else "#1b5e20"
         hdr_item = self._table.horizontalHeaderItem(8)
         hdr_item.setText(f"Valor  |  {fmt_valor(soma)}")
         hdr_item.setForeground(QBrush(QColor(cor_hex)))
+        total = len(self._all_rows)
+        self._status.setText(
+            f"Exibindo {vis} de {total} registros" +
+            (f"  |  filtro ativo" if vis < total else ""))
+
+    def _ajustar_larguras(self):
+        """Restaura larguras salvas ou auto-ajusta apenas na 1ª carga da sessão."""
         hdr = self._table.horizontalHeader()
-        # bloqueia sinal para que o auto-ajuste NÃO sobrescreva o config salvo
         hdr.sectionResized.disconnect(self._salvar_layout)
         saved = cfg_load().get("dados_col_widths")
         if saved and len(saved) == self._table.columnCount():
             # layout salvo pelo usuário: restaura direto, ignora auto-ajuste
             for c, w in enumerate(saved):
                 self._table.setColumnWidth(c, w)
-        else:
-            # sem layout salvo: aplica auto-ajuste por conteúdo + cabeçalho
+        elif not self._auto_ajuste_feito:
+            # sem layout salvo: auto-ajuste por conteúdo + cabeçalho (uma vez)
             self._table.resizeColumnsToContents()
             fm = self._table.fontMetrics()
             for col in range(self._table.columnCount()):
@@ -778,16 +853,29 @@ class AbaForm(QWidget):
                 hdr_w = fm.horizontalAdvance(hdr_txt.text() if hdr_txt else "") + 24
                 if hdr_w > hdr.sectionSize(col):
                     hdr.resizeSection(col, hdr_w)
+            self._auto_ajuste_feito = True
         hdr.sectionResized.connect(self._salvar_layout)
-        total = len(self._all_rows)
-        self._status.setText(
-            f"Exibindo {vis} de {total} registros" +
-            (f"  |  filtro ativo" if vis < total else ""))
+
+    def _aplicar_filtro(self):
+        crit = self._criterios_filtro()
+        self._table.setSortingEnabled(False)
+        self._table.setRowCount(0)
+        for r in self._all_rows:
+            # r = (id, Data, Mes, Ano, Categoria, Sub_Categoria, Transacao, Descricao, Valor)
+            if not self._passa_filtro(r, crit):
+                continue
+            i = self._table.rowCount()
+            self._table.insertRow(i)
+            self._montar_item_linha(i, r)
+        self._table.setSortingEnabled(True)
+        self._atualizar_soma_status()
+        self._ajustar_larguras()
 
     # ── carga ─────────────────────────────────────────────
     def _carregar(self):
         _, rows = buscar_todos()
-        self._all_rows = rows
+        self._all_rows = list(rows)
+        self._auto_ajuste_feito = False   # recarga completa reavalia larguras
         self._atualizar_combos()
         self._atualizar_filtros_combo()
         self._aplicar_filtro()
