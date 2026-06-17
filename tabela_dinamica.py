@@ -1182,6 +1182,13 @@ class AbaPivot(QWidget):
         self._tree.setSortingEnabled(False)
         self._tree.header().setSectionResizeMode(QHeaderView.Interactive)
         self._tree.setFont(QFont("Segoe UI", 11))
+        # ordenação por clique no cabeçalho (manual, sobre os dados)
+        self._sort_col  = None    # None = ordem padrão (alfabética por grupo)
+        self._sort_desc = True
+        hdr = self._tree.header()
+        hdr.setSectionsClickable(True)
+        hdr.setSortIndicatorShown(True)
+        hdr.sectionClicked.connect(self._on_header_click)
         root.addWidget(self._tree, 1)
 
         self._status = QLabel("")
@@ -1297,9 +1304,21 @@ class AbaPivot(QWidget):
                 self._excluidos2 = set(cfg["excluidos2"])
             if "expandidos" in cfg:
                 self._expandidos = set(cfg["expandidos"])
+            if cfg.get("sort_col") is not None:
+                self._sort_col = int(cfg["sort_col"])
+            self._sort_desc = bool(cfg.get("sort_desc", True))
         finally:
             for w in widgets:
                 w.blockSignals(False)
+
+    # ── ordenação por clique no cabeçalho ─────────────────
+    def _on_header_click(self, col: int):
+        if self._sort_col == col:
+            self._sort_desc = not self._sort_desc   # alterna direção
+        else:
+            self._sort_col  = col
+            self._sort_desc = True                  # nova coluna: maior→menor
+        self._gerar()
 
     # ── estado de expansão dos grupos ────────────────────
     def _on_expansao(self, item: QTreeWidgetItem, expandido: bool):
@@ -1465,6 +1484,49 @@ class AbaPivot(QWidget):
 
         gt_tot = soma_d(grand)
 
+        # ── ordenação por coluna (sobre os dados, não a árvore) ──
+        # reseta se a coluna salva não existe mais nesta configuração
+        if self._sort_col is not None and self._sort_col >= len(hdrs):
+            self._sort_col = None
+
+        if self._sort_col is not None:
+            sc = self._sort_col
+
+            def chave_valor(g_cv, g_tot):
+                """Valor numérico da coluna sc para ordenação."""
+                if sc == 0:
+                    return None
+                if sc == len(hdrs) - 1:        # coluna Total Geral
+                    return g_tot
+                return g_cv.get(str(col_vals[sc - 1]), 0.0)
+
+            if sc == 0:
+                # coluna de rótulo: ordena pelo próprio valor do grupo
+                dados_grupos.sort(key=lambda t: t[0], reverse=self._sort_desc)
+            else:
+                dados_grupos.sort(
+                    key=lambda t: chave_valor(t[1], t[2]), reverse=self._sort_desc)
+
+            # ordena também os subgrupos dentro de cada grupo
+            for _g, _cv, _tot, subs in dados_grupos:
+                if sc == 0:
+                    subs.sort(key=lambda s: s[0], reverse=self._sort_desc)
+                else:
+                    subs.sort(key=lambda s: chave_valor(s[1], s[2]),
+                              reverse=self._sort_desc)
+
+        # indicador visual de ordenação no cabeçalho
+        hdr = self._tree.header()
+        hdr.blockSignals(True)
+        if self._sort_col is None:
+            hdr.setSortIndicatorShown(False)
+        else:
+            hdr.setSortIndicatorShown(True)
+            hdr.setSortIndicator(
+                self._sort_col,
+                Qt.DescendingOrder if self._sort_desc else Qt.AscendingOrder)
+        hdr.blockSignals(False)
+
         def fmt_cel(v, is_total_geral_cell=False):
             """Formata célula em valor ou %."""
             if not usar_pct:
@@ -1553,6 +1615,8 @@ class AbaPivot(QWidget):
             "excluidos1":  list(self._excluidos1),
             "excluidos2":  list(self._excluidos2),
             "expandidos":  list(self._expandidos),
+            "sort_col":    self._sort_col,
+            "sort_desc":   self._sort_desc,
         }})
 
     # ── exportar ──────────────────────────────────────────
