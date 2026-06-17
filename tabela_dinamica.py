@@ -115,6 +115,17 @@ def _mes_ano(data_str: str):
     return None, None
 
 
+def _parse_data(data_str: str):
+    """Converte a string de data para datetime; None se não reconhecer."""
+    for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y",
+                "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.datetime.strptime(str(data_str).strip(), fmt)
+        except ValueError:
+            pass
+    return None
+
+
 def _parse_valor(raw) -> float:
     s = re.sub(r"[R$\s]", "", str(raw).strip())
     if "," in s and "." in s:
@@ -790,8 +801,13 @@ class AbaForm(QWidget):
 
 
     # ── exportação ────────────────────────────────────────
-    def _linhas_visiveis(self):
-        """Retorna linhas visíveis; coluna Valor como número puro (sem R$)."""
+    def _linhas_visiveis(self, tipado=False):
+        """Retorna linhas visíveis; coluna Valor como número puro (sem R$).
+
+        Se tipado=True, converte id/Mês/Ano para inteiro e Data para
+        datetime, para que o Excel reconheça os campos como numéricos/data
+        em vez de texto.
+        """
         rows = []
         for i in range(self._table.rowCount()):
             row = []
@@ -800,6 +816,14 @@ class AbaForm(QWidget):
                 if j == 8 and it:                          # coluna Valor
                     raw = it.data(Qt.UserRole)
                     row.append(raw if raw is not None else "")
+                elif tipado and j in (0, 2, 3) and it:     # id, Mês, Ano → int
+                    txt = it.text().strip()
+                    try:
+                        row.append(int(float(txt)) if txt != "" else "")
+                    except ValueError:
+                        row.append(txt)
+                elif tipado and j == 1 and it:             # Data → datetime
+                    row.append(_parse_data(it.text()) or it.text())
                 else:
                     row.append(it.text() if it else "")
             rows.append(row)
@@ -827,11 +851,13 @@ class AbaForm(QWidget):
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill("solid", fgColor="4472C4")
             cell.alignment = Alignment(horizontal="center")
-        for r, row in enumerate(self._linhas_visiveis(), 2):
+        for r, row in enumerate(self._linhas_visiveis(tipado=True), 2):
             for c, val in enumerate(row, 1):
                 cell = ws.cell(row=r, column=c, value=val)
                 cell.alignment = Alignment(
                     horizontal="right" if c == len(hdrs) else "center")
+                if c == 2 and isinstance(val, datetime.datetime):   # Data
+                    cell.number_format = "dd/mm/yyyy hh:mm:ss"
         for col in ws.columns:
             w = max((len(str(c.value or "")) for c in col), default=8)
             ws.column_dimensions[col[0].column_letter].width = min(w + 2, 40)
@@ -847,10 +873,19 @@ class AbaForm(QWidget):
         import csv
         hdrs = [COLS_DADOS[i] if i != 8 else "Valor"
                 for i in range(len(COLS_DADOS))]
+        linhas = []
+        for row in self._linhas_visiveis(tipado=True):
+            nova = []
+            for val in row:
+                if isinstance(val, datetime.datetime):
+                    nova.append(val.strftime("%d/%m/%Y %H:%M:%S"))
+                else:
+                    nova.append(val)
+            linhas.append(nova)
         with open(path, "w", newline="", encoding="utf-8-sig") as f:
             writer = csv.writer(f, delimiter=";")
             writer.writerow(hdrs)
-            writer.writerows(self._linhas_visiveis())
+            writer.writerows(linhas)
         QMessageBox.information(self, "Sucesso",
             f"{self._table.rowCount()} registros exportados para:\n{path}")
 
