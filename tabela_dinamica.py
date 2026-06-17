@@ -366,15 +366,11 @@ class AbaForm(QWidget):
 
         # botões do formulário
         btn_row = QHBoxLayout()
-        self._btn_salvar  = _btn("Salvar",             "#4CAF50", self._salvar,  140)
-        self._btn_limpar  = _btn("Limpar",             "#2196F3", self._limpar,  140)
-        self._btn_excluir = _btn("Excluir Selecionado","#f44336", self._excluir, 180)
-        self._btn_dup     = _btn("Duplicar Selecionado","#00897B", self._duplicar, 180)
-        self._btn_lote    = _btn("Aplicar a Selecionados", "#E65100", self._aplicar_lote, 200)
-        for b in (self._btn_salvar, self._btn_limpar, self._btn_excluir,
-                  self._btn_dup, self._btn_lote):
-            b.setStyleSheet(b.styleSheet().replace("padding:6px 18px", "padding:10px 28px")
-                                          .replace("font-size:12px", "font-size:14px"))
+        self._btn_salvar  = _btn("Salvar",             "#4CAF50", self._salvar,  110)
+        self._btn_limpar  = _btn("Limpar",             "#2196F3", self._limpar,  110)
+        self._btn_excluir = _btn("Excluir Selecionado","#f44336", self._excluir, 150)
+        self._btn_dup     = _btn("Duplicar Selecionado","#00897B", self._duplicar, 150)
+        self._btn_lote    = _btn("Aplicar a Selecionados", "#E65100", self._aplicar_lote, 160)
         self._btn_lote.setVisible(False)
         self._btn_dup.setVisible(False)
         btn_row.addWidget(self._btn_salvar)
