@@ -24,9 +24,9 @@ from PyQt5.QtWidgets import (
     QMessageBox, QTableWidget, QTableWidgetItem,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QSplitter,
     QAbstractItemView, QStatusBar, QFrame, QCompleter,
-    QMenu, QWidgetAction,
+    QMenu, QWidgetAction, QDateEdit,
 )
-from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel, QStringListModel
+from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel, QStringListModel, QDate
 from PyQt5.QtGui import QColor, QBrush, QFont, QPalette
 
 def _app_dir() -> str:
@@ -182,6 +182,19 @@ def buscar_todos():
     cols = [d[0] for d in cur.description]
     con.close()
     return cols, rows
+
+
+def buscar_ultimo_registro():
+    """Retorna o registro real (não dummy) mais recentemente inserido, ou None."""
+    con = sqlite3.connect(DB_PATH)
+    cur = con.execute(
+        "SELECT Data,Categoria,Sub_Categoria,Transacao FROM registros"
+        " WHERE Ano != 1900 ORDER BY id DESC LIMIT 1")
+    row = cur.fetchone()
+    con.close()
+    if not row:
+        return None
+    return {"Data": row[0], "Categoria": row[1], "Sub_Categoria": row[2], "Transacao": row[3]}
 
 
 def apagar_banco():
@@ -356,14 +369,18 @@ class AbaForm(QWidget):
         self._btn_salvar  = _btn("Salvar",             "#4CAF50", self._salvar,  140)
         self._btn_limpar  = _btn("Limpar",             "#2196F3", self._limpar,  140)
         self._btn_excluir = _btn("Excluir Selecionado","#f44336", self._excluir, 180)
+        self._btn_dup     = _btn("Duplicar Selecionado","#00897B", self._duplicar, 180)
         self._btn_lote    = _btn("Aplicar a Selecionados", "#E65100", self._aplicar_lote, 200)
-        for b in (self._btn_salvar, self._btn_limpar, self._btn_excluir, self._btn_lote):
+        for b in (self._btn_salvar, self._btn_limpar, self._btn_excluir,
+                  self._btn_dup, self._btn_lote):
             b.setStyleSheet(b.styleSheet().replace("padding:6px 18px", "padding:10px 28px")
                                           .replace("font-size:12px", "font-size:14px"))
         self._btn_lote.setVisible(False)
+        self._btn_dup.setVisible(False)
         btn_row.addWidget(self._btn_salvar)
         btn_row.addWidget(self._btn_limpar)
         btn_row.addWidget(self._btn_excluir)
+        btn_row.addWidget(self._btn_dup)
         btn_row.addWidget(self._btn_lote)
         btn_row.addStretch()
         form.addLayout(btn_row, len(specs), 0, 1, 2)
@@ -384,6 +401,7 @@ class AbaForm(QWidget):
 
         self._flt_widgets = {}
         flt_specs = [
+            ("data", "Data",          110),
             ("cat",  "Categoria",     120),
             ("sub",  "Sub-Categoria", 120),
             ("tran", "Transação",     150),
@@ -534,6 +552,10 @@ class AbaForm(QWidget):
         self._carregando_selecao = True
         for key in self._campos:
             self._clear_field(key)
+        ultimo = buscar_ultimo_registro()
+        if ultimo:
+            for key in ("Data", "Categoria", "Sub_Categoria", "Transacao"):
+                self._set_text(key, ultimo[key] or "")
         self._carregando_selecao = False
         self._edit_id = None
         self._dirty.clear()
@@ -567,9 +589,11 @@ class AbaForm(QWidget):
         sel = self._table.selectionModel().selectedRows()
         if not sel:
             self._btn_lote.setVisible(False)
+            self._btn_dup.setVisible(False)
             return
         multi = len(sel) > 1
         self._btn_lote.setVisible(multi)
+        self._btn_dup.setVisible(not multi)
         self._btn_salvar.setVisible(not multi)
 
         # carrega dados da primeira linha selecionada no formulário
@@ -586,6 +610,26 @@ class AbaForm(QWidget):
         self._set_text("Valor", str(raw) if raw is not None else "")
         self._carregando_selecao = False
         self._btn_salvar.setText("Atualizar" if not multi else "Salvar")
+
+    def _duplicar(self):
+        sel = self._table.selectionModel().selectedRows()
+        if not sel:
+            return
+        r = sel[0].row()
+        self._carregando_selecao = True
+        self._set_text("Data",          self._table.item(r, 1).text())
+        self._set_text("Categoria",     self._table.item(r, 4).text())
+        self._set_text("Sub_Categoria", self._table.item(r, 5).text())
+        self._set_text("Transacao",     self._table.item(r, 6).text())
+        self._set_text("Descricao",     self._table.item(r, 7).text())
+        raw = self._table.item(r, 8).data(Qt.UserRole)
+        self._set_text("Valor", str(raw) if raw is not None else "")
+        self._carregando_selecao = False
+        self._edit_id = None
+        self._dirty.clear()
+        self._btn_salvar.setText("Salvar")
+        self._btn_salvar.setVisible(True)
+        self._table.clearSelection()
 
     def _aplicar_lote(self):
         sel = self._table.selectionModel().selectedRows()
@@ -646,6 +690,7 @@ class AbaForm(QWidget):
         self._aplicar_filtro()
 
     def _aplicar_filtro(self):
+        f_data = self._flt_widgets["data"].text().lower()
         f_cat  = self._flt_widgets["cat"].text().lower()
         f_sub  = self._flt_widgets["sub"].text().lower()
         f_tran = self._flt_widgets["tran"].text().lower()
@@ -661,6 +706,7 @@ class AbaForm(QWidget):
         vis = 0
         for r in self._all_rows:
             # r = (id, Data, Mes, Ano, Categoria, Sub_Categoria, Transacao, Descricao, Valor)
+            if f_data and f_data not in str(r[1]).lower(): continue
             if f_cat  and f_cat  not in str(r[4]).lower(): continue
             if f_sub  and f_sub  not in str(r[5]).lower(): continue
             if f_tran and f_tran not in str(r[6]).lower(): continue
@@ -1095,6 +1141,27 @@ class AbaPivot(QWidget):
             rb_row.addWidget(rb)
         rb_row.addStretch()
         lay_flt.addLayout(rb_row, 2, 1, 1, 5)
+
+        # filtro por período (faixa de datas)
+        self._chk_periodo = QCheckBox("Filtrar por período:")
+        lay_flt.addWidget(self._chk_periodo, 3, 0, Qt.AlignRight)
+        per_row = QHBoxLayout()
+        per_row.setSpacing(6)
+        per_row.addWidget(lbl("De:"))
+        self._dt_de = QDateEdit(); self._dt_de.setCalendarPopup(True)
+        self._dt_de.setDisplayFormat("dd/MM/yyyy")
+        self._dt_de.setDate(QDate.currentDate())
+        self._dt_de.setEnabled(False)
+        per_row.addWidget(self._dt_de)
+        per_row.addWidget(lbl("Até:"))
+        self._dt_ate = QDateEdit(); self._dt_ate.setCalendarPopup(True)
+        self._dt_ate.setDisplayFormat("dd/MM/yyyy")
+        self._dt_ate.setDate(QDate.currentDate())
+        self._dt_ate.setEnabled(False)
+        per_row.addWidget(self._dt_ate)
+        per_row.addStretch()
+        lay_flt.addLayout(per_row, 3, 1, 1, 5)
+        self._chk_periodo.toggled.connect(self._on_toggle_periodo)
         root.addWidget(grp_flt)
 
         # ── botões expandir/recolher ──────────────────────
@@ -1133,6 +1200,9 @@ class AbaPivot(QWidget):
             chk.stateChanged.connect(self._gerar)
         for rb in (self._rb_todos, self._rb_pos, self._rb_neg):
             rb.toggled.connect(self._gerar)
+        self._chk_periodo.toggled.connect(self._gerar)
+        self._dt_de.dateChanged.connect(self._gerar)
+        self._dt_ate.dateChanged.connect(self._gerar)
 
         self._tree.itemExpanded.connect(
             lambda item: self._on_expansao(item, True))
@@ -1154,7 +1224,16 @@ class AbaPivot(QWidget):
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
         df["Mes"]   = pd.to_numeric(df["Mes"],   errors="coerce")
         df["Ano"]   = pd.to_numeric(df["Ano"],   errors="coerce")
+        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
         return df
+
+    def _on_toggle_periodo(self, ligado):
+        self._dt_de.setEnabled(ligado)
+        self._dt_ate.setEnabled(ligado)
+        if ligado:
+            hoje = QDate.currentDate()
+            self._dt_de.blockSignals(True);  self._dt_de.setDate(hoje);  self._dt_de.blockSignals(False)
+            self._dt_ate.blockSignals(True); self._dt_ate.setDate(hoje); self._dt_ate.blockSignals(False)
 
     def _atualizar_filtros(self):
         df = self._carregar_df()
@@ -1302,6 +1381,10 @@ class AbaPivot(QWidget):
             df = df[df["Transacao"]     == self._f_tran.currentText()]
         if self._f_sub.currentText()  != "(todos)":
             df = df[df["Sub_Categoria"] == self._f_sub.currentText()]
+        if self._chk_periodo.isChecked():
+            de  = self._dt_de.date().toPyDate()
+            ate = self._dt_ate.date().toPyDate()
+            df = df[(df["_DataDT"].dt.date >= de) & (df["_DataDT"].dt.date <= ate)]
 
         # exclusões de itens de linha 1 e linha 2
         row1_campo = self._row1.currentText()
@@ -1563,6 +1646,25 @@ class AbaDashboard(QWidget):
         self._f_mes = QComboBox(); self._f_mes.setMinimumWidth(150)
         self._f_mes.currentIndexChanged.connect(self._preencher)
         flt.addWidget(self._f_mes)
+
+        self._chk_periodo = QCheckBox("  Filtrar por período:")
+        self._chk_periodo.toggled.connect(self._on_toggle_periodo)
+        flt.addWidget(self._chk_periodo)
+        flt.addWidget(QLabel("De:"))
+        self._dt_de = QDateEdit(); self._dt_de.setCalendarPopup(True)
+        self._dt_de.setDisplayFormat("dd/MM/yyyy")
+        self._dt_de.setDate(QDate.currentDate())
+        self._dt_de.setEnabled(False)
+        self._dt_de.dateChanged.connect(self._preencher)
+        flt.addWidget(self._dt_de)
+        flt.addWidget(QLabel("Até:"))
+        self._dt_ate = QDateEdit(); self._dt_ate.setCalendarPopup(True)
+        self._dt_ate.setDisplayFormat("dd/MM/yyyy")
+        self._dt_ate.setDate(QDate.currentDate())
+        self._dt_ate.setEnabled(False)
+        self._dt_ate.dateChanged.connect(self._preencher)
+        flt.addWidget(self._dt_ate)
+
         flt.addStretch()
         root.addLayout(flt)
 
@@ -1659,6 +1761,15 @@ class AbaDashboard(QWidget):
         tbl.setHorizontalHeaderLabels([dim_nome, "Total", "%"])
         tbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
 
+    def _on_toggle_periodo(self, ligado):
+        self._dt_de.setEnabled(ligado)
+        self._dt_ate.setEnabled(ligado)
+        if ligado:
+            hoje = QDate.currentDate()
+            self._dt_de.blockSignals(True);  self._dt_de.setDate(hoje);  self._dt_de.blockSignals(False)
+            self._dt_ate.blockSignals(True); self._dt_ate.setDate(hoje); self._dt_ate.blockSignals(False)
+        self._preencher()
+
     def atualizar(self):
         if not PANDAS_OK:
             return
@@ -1669,6 +1780,7 @@ class AbaDashboard(QWidget):
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
         df["Mes"]   = pd.to_numeric(df["Mes"],   errors="coerce")
         df["Ano"]   = pd.to_numeric(df["Ano"],   errors="coerce")
+        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
         df = df[df["Ano"] != 1900]
         self._df_full = df
 
@@ -1692,6 +1804,10 @@ class AbaDashboard(QWidget):
         mes_sel = self._f_mes.currentText()
         if mes_sel != "(todos)":
             df = df[df["Mes"] == int(mes_sel.split(" – ")[0])]
+        if self._chk_periodo.isChecked():
+            de  = self._dt_de.date().toPyDate()
+            ate = self._dt_ate.date().toPyDate()
+            df = df[(df["_DataDT"].dt.date >= de) & (df["_DataDT"].dt.date <= ate)]
 
         entradas = df[df["Valor"] > 0]["Valor"].sum()
         saidas   = df[df["Valor"] < 0]["Valor"].sum()
