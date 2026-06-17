@@ -1447,9 +1447,6 @@ class AbaPivot(QWidget):
             return ({str(cv): agregar(sub[sub[col_fld] == cv]) for cv in col_vals}
                     if use_cols else {"Valor": agregar(sub)})
 
-        def soma_d(d):
-            return sum(v for v in d.values() if isinstance(v, (int, float)) and not pd.isna(v))
-
         # ── configurar QTreeWidget ────────────────────────
         hdrs = [f"{row1}" + (f" / {row2}" if use_row2 else "")] + \
                [str(cv) for cv in col_vals] + ["Total Geral"]
@@ -1468,24 +1465,28 @@ class AbaPivot(QWidget):
         usar_pct = self._chk_pct.isChecked()
 
         # ── 1ª passagem: calcular todos os valores e o total geral ──
-        grand = {str(cv): 0.0 for cv in col_vals}
+        # os totais (linha/coluna/geral) são recalculados aplicando a MESMA
+        # agregação sobre o conjunto de registros correspondente — somar os
+        # subtotais já agregados só é correto para "sum"; para mean/min/max/
+        # count isso daria um resultado errado.
         grupos = sorted(df[row1].dropna().unique().tolist())
         dados_grupos = []
         for g in grupos:
             g_df  = df[df[row1] == g]
             g_cv  = vals_por_col(g_df)
-            g_tot = soma_d(g_cv)
-            for k in grand: grand[k] += g_cv.get(k, 0.0)
+            g_tot = agregar(g_df)
             subgrupos_dados = []
             if use_row2:
                 for sg in sorted(g_df[row2].dropna().unique().tolist()):
                     sg_df = g_df[g_df[row2] == sg]
                     sg_cv = vals_por_col(sg_df)
-                    sg_tot = soma_d(sg_cv)
+                    sg_tot = agregar(sg_df)
                     subgrupos_dados.append((sg, sg_cv, sg_tot))
             dados_grupos.append((g, g_cv, g_tot, subgrupos_dados))
 
-        gt_tot = soma_d(grand)
+        grand = ({str(cv): agregar(df[df[col_fld] == cv]) for cv in col_vals}
+                 if use_cols else {"Valor": agregar(df)})
+        gt_tot = agregar(df)
 
         # ── ordenação por coluna (sobre os dados, não a árvore) ──
         # reseta se a coluna salva não existe mais nesta configuração
