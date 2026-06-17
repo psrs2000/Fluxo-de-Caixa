@@ -1348,6 +1348,7 @@ class AbaPivot(QWidget):
         menu = QMenu(self)
         menu.setStyleSheet("QMenu { padding:4px; } QCheckBox { padding:4px 8px; }")
 
+        checks = []
         for item in itens:
             wa = QWidgetAction(menu)
             chk = QCheckBox(str(item), menu)
@@ -1362,12 +1363,22 @@ class AbaPivot(QWidget):
             chk.toggled.connect(make_toggle(item_str, excluidos))
             wa.setDefaultWidget(chk)
             menu.addAction(wa)
+            checks.append(chk)
 
+        menu.addSeparator()
+        act_todos = menu.addAction("Marcar todos")
+        act_todos.triggered.connect(lambda: self._marcar_todos_exclusao(checks, True))
+        act_nenhum = menu.addAction("Desmarcar todos")
+        act_nenhum.triggered.connect(lambda: self._marcar_todos_exclusao(checks, False))
         menu.addSeparator()
         act_clear = menu.addAction("Limpar exclusões")
         act_clear.triggered.connect(lambda: self._limpar_exclusoes(linha))
 
         menu.exec_(btn.mapToGlobal(btn.rect().bottomLeft()))
+
+    def _marcar_todos_exclusao(self, checks, marcado: bool):
+        for chk in checks:
+            chk.setChecked(marcado)
 
     def _limpar_exclusoes(self, linha: int):
         if linha == 1: self._excluidos1.clear()
