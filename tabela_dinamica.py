@@ -1370,20 +1370,12 @@ class AbaPivot(QWidget):
         act_todos.triggered.connect(lambda: self._marcar_todos_exclusao(checks, True))
         act_nenhum = menu.addAction("Desmarcar todos")
         act_nenhum.triggered.connect(lambda: self._marcar_todos_exclusao(checks, False))
-        menu.addSeparator()
-        act_clear = menu.addAction("Limpar exclusões")
-        act_clear.triggered.connect(lambda: self._limpar_exclusoes(linha))
 
         menu.exec_(btn.mapToGlobal(btn.rect().bottomLeft()))
 
     def _marcar_todos_exclusao(self, checks, marcado: bool):
         for chk in checks:
             chk.setChecked(marcado)
-
-    def _limpar_exclusoes(self, linha: int):
-        if linha == 1: self._excluidos1.clear()
-        else:          self._excluidos2.clear()
-        self._gerar()
 
     # ── gerar ─────────────────────────────────────────────
     def _gerar(self):
