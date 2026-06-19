@@ -1566,6 +1566,11 @@ class AbaCategorias(QWidget):
         root.addLayout(cols, 1)
 
     # ── recarregar listas ─────────────────────────────────
+    def recarregar(self):
+        """Recarrega todas as listas (ex.: após importação em outra aba)."""
+        self._recarregar_categorias()
+        self._recarregar_transacoes()
+
     def _recarregar_categorias(self):
         atual = self._lst_cat.currentItem().text() if self._lst_cat.currentItem() else None
         self._lst_cat.clear()
@@ -2798,6 +2803,8 @@ class MainWindow(QMainWindow):
         event.accept()
 
     def _on_tab(self, idx):
+        if idx == 2:
+            self._aba_categorias.recarregar()
         if idx == 3:
             self._aba_pivot._gerar()
         if idx == 4:
