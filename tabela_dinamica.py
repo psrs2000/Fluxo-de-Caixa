@@ -3044,22 +3044,19 @@ class AbaEvolucao(QWidget):
             if self._lst_dim.item(i).checkState() == Qt.Checked
         ]
         if selecionados and not df_filtrado.empty:
-            series_por_nome = {}
-            for nome in selecionados:
-                serie = self._agrupar_periodo(df_filtrado[df_filtrado[col] == nome], gran)
-                if serie.empty:
-                    continue
-                series_por_nome[nome] = serie
-                ax.plot(serie.index, serie.values, marker="o", linewidth=1.6, label=nome)
-            if len(selecionados) == 1 and selecionados[0] in series_por_nome:
-                self._lbl_tend_dim.setText(
-                    self._desenhar_tendencia(ax, series_por_nome[selecionados[0]]))
-            elif len(selecionados) == 1:
-                self._lbl_tend_dim.setText("")
+            df_sel = df_filtrado[df_filtrado[col].isin(selecionados)]
+            serie = self._agrupar_periodo(df_sel, gran)
+            if not serie.empty:
+                if len(selecionados) == 1:
+                    label = selecionados[0]
+                else:
+                    label = f"Soma de {len(selecionados)} itens"
+                ax.plot(serie.index, serie.values, marker="o",
+                         color="#2E7D32", linewidth=1.8, label=label)
+                self._lbl_tend_dim.setText(self._desenhar_tendencia(ax, serie))
+                ax.legend(fontsize=8, loc="best")
             else:
-                self._lbl_tend_dim.setText(
-                    "Selecione apenas 1 item na lista para ver a linha de tendência.")
-            ax.legend(fontsize=8, loc="best")
+                self._lbl_tend_dim.setText("")
         else:
             self._lbl_tend_dim.setText("")
         self._formatar_eixo(ax, self._fig_dim)
