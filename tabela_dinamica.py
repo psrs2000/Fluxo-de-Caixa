@@ -11,16 +11,6 @@ except ImportError:
     PANDAS_OK = False
 
 try:
-    import numpy as np
-    from matplotlib.figure import Figure
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-    MATPLOTLIB_OK = True
-    MATPLOTLIB_ERRO = ""
-except Exception as _e:
-    MATPLOTLIB_OK = False
-    MATPLOTLIB_ERRO = f"{type(_e).__name__}: {_e}"
-
-try:
     import openpyxl
     OPENPYXL_OK = True
 except ImportError:
@@ -2764,10 +2754,16 @@ class AbaDashboard(QWidget):
 
 
 # ═══════════════════════════════════════════════════════════
-#  ABA EVOLUÇÃO
+#  ABA TENDÊNCIAS
 # ═══════════════════════════════════════════════════════════
 
-class AbaEvolucao(QWidget):
+class AbaTendencias(QWidget):
+
+    DIMS = {
+        "Categoria":     "Categoria",
+        "Sub-Categoria": "Sub_Categoria",
+        "Transação":     "Transacao",
+    }
 
     def __init__(self):
         super().__init__()
@@ -2822,85 +2818,123 @@ class AbaEvolucao(QWidget):
         flt.addStretch()
         root.addLayout(flt)
 
-        # ── 2 painéis lado a lado ──────────────────────────
-        row = QHBoxLayout()
-        row.setSpacing(14)
+        # ── card de destaque: tendência do saldo ──────────
+        self._card_tend_saldo = self._make_card_destaque("Tendência do Saldo")
+        root.addWidget(self._card_tend_saldo)
 
-        # painel esquerdo: Categoria / Sub-Categoria (múltipla seleção)
-        grp_dim = QGroupBox("Evolução Acumulada por Categoria / Sub-Categoria")
-        lay_dim = QVBoxLayout(grp_dim)
-        lay_dim.setSpacing(6)
+        # ── 3 painéis: Categoria / Sub-Categoria / Transação
+        paineis_row = QHBoxLayout()
+        paineis_row.setSpacing(14)
+        self._paineis = []
+        for nome_dim, col_dim in self.DIMS.items():
+            grp = QGroupBox(nome_dim)
+            lay = QVBoxLayout(grp)
+            lay.setSpacing(6)
 
-        ctrl_dim = QHBoxLayout()
-        self._rb_cat = QRadioButton("Categoria"); self._rb_cat.setChecked(True)
-        self._rb_sub = QRadioButton("Sub-Categoria")
-        self._grp_rb_dim = QButtonGroup(self)
-        self._grp_rb_dim.addButton(self._rb_cat)
-        self._grp_rb_dim.addButton(self._rb_sub)
-        self._rb_cat.toggled.connect(self._on_modo_changed)
-        ctrl_dim.addWidget(self._rb_cat)
-        ctrl_dim.addWidget(self._rb_sub)
-        ctrl_dim.addStretch()
-        ctrl_dim.addWidget(_btn("Marcar todos", "#1565C0", self._marcar_todos, 105))
-        ctrl_dim.addWidget(_btn("Nenhum",       "#757575", self._desmarcar_todos, 80))
-        lay_dim.addLayout(ctrl_dim)
+            lst = QListWidget()
+            ctrl = QHBoxLayout()
+            ctrl.addStretch()
+            ctrl.addWidget(_btn("Marcar todos", "#1565C0",
+                                  lambda _, l=lst: self._marcar_todos(l), 105))
+            ctrl.addWidget(_btn("Nenhum", "#757575",
+                                  lambda _, l=lst: self._desmarcar_todos(l), 80))
+            lay.addLayout(ctrl)
 
-        body_dim = QHBoxLayout()
-        self._lst_dim = QListWidget()
-        self._lst_dim.setMaximumWidth(170)
-        self._lst_dim.itemChanged.connect(self._on_item_changed)
-        body_dim.addWidget(self._lst_dim)
+            lst.itemChanged.connect(self._preencher)
+            lay.addWidget(lst, 1)
 
-        if MATPLOTLIB_OK:
-            self._fig_dim = Figure(figsize=(4, 3))
-            self._canvas_dim = FigureCanvas(self._fig_dim)
-            body_dim.addWidget(self._canvas_dim, 1)
-        else:
-            lbl_erro = QLabel(f"Gráficos indisponíveis.\n\n{MATPLOTLIB_ERRO}")
-            lbl_erro.setWordWrap(True)
-            lbl_erro.setStyleSheet("color:#c62828;")
-            body_dim.addWidget(lbl_erro, 1)
-        lay_dim.addLayout(body_dim, 1)
+            card_media = self._make_card_painel()
+            lay.addWidget(card_media)
 
-        self._lbl_tend_dim = QLabel("")
-        self._lbl_tend_dim.setWordWrap(True)
-        self._lbl_tend_dim.setStyleSheet("color:#555; font-size:11px;")
-        lay_dim.addWidget(self._lbl_tend_dim)
-        row.addWidget(grp_dim, 1)
+            paineis_row.addWidget(grp)
+            self._paineis.append({"col": col_dim, "lst": lst, "card": card_media})
+        root.addLayout(paineis_row, 1)
 
-        # painel direito: Saldo (fixo)
-        grp_sal = QGroupBox("Evolução do Saldo Acumulado")
-        lay_sal = QVBoxLayout(grp_sal)
-        if MATPLOTLIB_OK:
-            self._fig_sal = Figure(figsize=(4, 3))
-            self._canvas_sal = FigureCanvas(self._fig_sal)
-            lay_sal.addWidget(self._canvas_sal, 1)
-        else:
-            lbl_erro2 = QLabel(f"Gráficos indisponíveis.\n\n{MATPLOTLIB_ERRO}")
-            lbl_erro2.setWordWrap(True)
-            lbl_erro2.setStyleSheet("color:#c62828;")
-            lay_sal.addWidget(lbl_erro2, 1)
+    def _make_card_destaque(self, titulo):
+        frame = QFrame()
+        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setStyleSheet(
+            "QFrame{background:#f5f5f5;border:2px solid #1565C0;border-radius:8px;}")
+        lay = QVBoxLayout(frame)
+        lay.setContentsMargins(16, 10, 16, 10)
+        lbl_t = QLabel(titulo)
+        lbl_t.setStyleSheet("font-size:12px;font-weight:bold;color:#1565C0;border:none;")
+        lbl_v = QLabel("—")
+        lbl_v.setStyleSheet("font-size:22px;font-weight:bold;color:#1565C0;border:none;")
+        lbl_v.setAlignment(Qt.AlignCenter)
+        lay.addWidget(lbl_t)
+        lay.addWidget(lbl_v)
+        frame._lbl = lbl_v
+        return frame
 
-        self._lbl_tend_sal = QLabel("")
-        self._lbl_tend_sal.setWordWrap(True)
-        self._lbl_tend_sal.setStyleSheet("color:#555; font-size:11px;")
-        lay_sal.addWidget(self._lbl_tend_sal)
-        row.addWidget(grp_sal, 1)
+    def _make_card_painel(self):
+        frame = QFrame()
+        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setStyleSheet(
+            "QFrame{background:#f5f5f5;border:1px solid #cccccc;border-radius:6px;}")
+        lay = QVBoxLayout(frame)
+        lay.setContentsMargins(10, 8, 10, 8)
+        lay.setSpacing(2)
+        lbl_t = QLabel("Média por período")
+        lbl_t.setStyleSheet("font-size:10px;color:#666;border:none;")
+        lbl_v = QLabel("—")
+        lbl_v.setStyleSheet("font-size:16px;font-weight:bold;border:none;")
+        lbl_v.setAlignment(Qt.AlignCenter)
+        lbl_total = QLabel("")
+        lbl_total.setStyleSheet("font-size:10px;color:#888;border:none;")
+        lbl_total.setAlignment(Qt.AlignCenter)
+        lay.addWidget(lbl_t)
+        lay.addWidget(lbl_v)
+        lay.addWidget(lbl_total)
+        frame._lbl_media = lbl_v
+        frame._lbl_total = lbl_total
+        return frame
 
-        root.addLayout(row, 1)
+    # ── seleção via checkbox ───────────────────────────────
+    def _marcar_todos(self, lst):
+        lst.blockSignals(True)
+        for i in range(lst.count()):
+            lst.item(i).setCheckState(Qt.Checked)
+        lst.blockSignals(False)
+        self._preencher()
+
+    def _desmarcar_todos(self, lst):
+        lst.blockSignals(True)
+        for i in range(lst.count()):
+            lst.item(i).setCheckState(Qt.Unchecked)
+        lst.blockSignals(False)
+        self._preencher()
+
+    def _popular_listas(self):
+        for painel in self._paineis:
+            col, lst = painel["col"], painel["lst"]
+            antigos_marcados = {
+                lst.item(i).text() for i in range(lst.count())
+                if lst.item(i).checkState() == Qt.Checked
+            }
+            lst.blockSignals(True)
+            lst.clear()
+            if hasattr(self, "_df_full"):
+                valores = sorted(v for v in self._df_full[col].dropna().unique() if str(v).strip())
+                for v in valores:
+                    item = QListWidgetItem(str(v))
+                    item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                    marcado = (not antigos_marcados) or (str(v) in antigos_marcados)
+                    item.setCheckState(Qt.Checked if marcado else Qt.Unchecked)
+                    lst.addItem(item)
+            lst.blockSignals(False)
 
     # ── persistência de configuração (config.json) ───────
     def _salvar_config(self):
-        cfg_save({"evolucao_config": {
+        cfg_save({"tendencias_config": {
             "f_ano":          self._f_ano.currentText(),
             "f_mes":          self._f_mes.currentText(),
             "periodo_ligado": self._chk_periodo.isChecked(),
             "granularidade":  self._cb_gran.currentText(),
-            "modo":           "Categoria" if self._rb_cat.isChecked() else "Sub-Categoria",
         }})
 
     def _restaurar_config(self):
-        cfg = cfg_load().get("evolucao_config")
+        cfg = cfg_load().get("tendencias_config")
         if not cfg:
             return
         self._cfg_pendente = cfg
@@ -2908,11 +2942,6 @@ class AbaEvolucao(QWidget):
             self._cb_gran.blockSignals(True)
             self._cb_gran.setCurrentText(cfg["granularidade"])
             self._cb_gran.blockSignals(False)
-        if cfg.get("modo") == "Sub-Categoria":
-            self._rb_sub.blockSignals(True)
-            self._rb_sub.setChecked(True)
-            self._rb_cat.blockSignals(False)
-            self._rb_sub.blockSignals(False)
         if "periodo_ligado" in cfg:
             self._chk_periodo.blockSignals(True)
             self._chk_periodo.setChecked(bool(cfg["periodo_ligado"]))
@@ -2928,47 +2957,6 @@ class AbaEvolucao(QWidget):
             self._dt_de.blockSignals(True);  self._dt_de.setDate(hoje);  self._dt_de.blockSignals(False)
             self._dt_ate.blockSignals(True); self._dt_ate.setDate(hoje); self._dt_ate.blockSignals(False)
         self._preencher()
-
-    def _on_modo_changed(self, _checked):
-        self._popular_lista_dim()
-        self._preencher()
-        self._salvar_config()
-
-    def _marcar_todos(self):
-        self._lst_dim.blockSignals(True)
-        for i in range(self._lst_dim.count()):
-            self._lst_dim.item(i).setCheckState(Qt.Checked)
-        self._lst_dim.blockSignals(False)
-        self._preencher()
-
-    def _desmarcar_todos(self):
-        self._lst_dim.blockSignals(True)
-        for i in range(self._lst_dim.count()):
-            self._lst_dim.item(i).setCheckState(Qt.Unchecked)
-        self._lst_dim.blockSignals(False)
-        self._preencher()
-
-    def _on_item_changed(self, _item):
-        self._preencher()
-
-    def _popular_lista_dim(self):
-        col = "Categoria" if self._rb_cat.isChecked() else "Sub_Categoria"
-        antigos_marcados = {
-            self._lst_dim.item(i).text()
-            for i in range(self._lst_dim.count())
-            if self._lst_dim.item(i).checkState() == Qt.Checked
-        }
-        self._lst_dim.blockSignals(True)
-        self._lst_dim.clear()
-        if hasattr(self, "_df_full"):
-            valores = sorted(v for v in self._df_full[col].dropna().unique() if str(v).strip())
-            for v in valores:
-                item = QListWidgetItem(str(v))
-                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                marcado = (not antigos_marcados) or (str(v) in antigos_marcados)
-                item.setCheckState(Qt.Checked if marcado else Qt.Unchecked)
-                self._lst_dim.addItem(item)
-        self._lst_dim.blockSignals(False)
 
     def atualizar(self):
         if not PANDAS_OK:
@@ -2995,106 +2983,76 @@ class AbaEvolucao(QWidget):
             cb.setCurrentIndex(idx if idx >= 0 else 0)
             cb.blockSignals(False)
         self._cfg_aplicado = True
-        self._popular_lista_dim()
+        self._popular_listas()
         self._preencher()
 
-    def _agrupar_periodo(self, df, gran):
+    def _contar_periodos(self, df, gran):
+        d = df.dropna(subset=["Ano", "Mes"])
+        if d.empty:
+            return 0
+        if gran == "Mês":
+            return d[["Ano", "Mes"]].drop_duplicates().shape[0]
+        return d["Ano"].drop_duplicates().shape[0]
+
+    def _serie_periodo(self, df, gran):
         if df.empty:
-            return pd.Series(dtype=float)
+            return []
         d = df.dropna(subset=["Ano", "Mes"]).copy()
         if d.empty:
-            return pd.Series(dtype=float)
+            return []
         if gran == "Mês":
             d["_key"] = d["Ano"].astype(int) * 100 + d["Mes"].astype(int)
         else:
             d["_key"] = d["Ano"].astype(int)
-        grp = d.groupby("_key")["Valor"].sum().sort_index().cumsum()
-        labels = []
-        for k in grp.index:
-            if gran == "Mês":
-                ano_k, mes_k = divmod(int(k), 100)
-                labels.append(f"{NOMES_MESES.get(mes_k, '')[:3]}/{ano_k}")
-            else:
-                labels.append(str(int(k)))
-        grp.index = labels
-        return grp
+        return d.groupby("_key")["Valor"].sum().sort_index().tolist()
 
-    def _desenhar_tendencia(self, ax, serie):
-        if len(serie) < 2:
-            return ""
-        x = np.arange(len(serie))
-        y = serie.values.astype(float)
-        coef = np.polyfit(x, y, 1)
-        slope = coef[0]
-        linha_tend = np.polyval(coef, x)
-        ax.plot(serie.index, linha_tend, linestyle="--", color="#888888",
-                 linewidth=1.2, label="Tendência")
-        if slope > 0.01:
-            sinal = "alta"
-        elif slope < -0.01:
-            sinal = "queda"
+    def _slope(self, valores):
+        n = len(valores)
+        if n < 2:
+            return None
+        xs = range(n)
+        mx = sum(xs) / n
+        my = sum(valores) / n
+        num = sum((x - mx) * (y - my) for x, y in zip(xs, valores))
+        den = sum((x - mx) ** 2 for x in xs)
+        return num / den if den else 0.0
+
+    def _atualizar_card_destaque(self, df, gran):
+        serie = self._serie_periodo(df, gran)
+        slope = self._slope(serie)
+        if slope is None:
+            self._card_tend_saldo._lbl.setText("Dados insuficientes para calcular a tendência")
+            cor = "#1565C0"
         else:
-            sinal = "estável"
-        return f"Tendência: {fmt_valor(slope)} por período  ({sinal})"
+            if slope > 0.01:
+                sinal = "alta"
+            elif slope < -0.01:
+                sinal = "queda"
+            else:
+                sinal = "estável"
+            cor = "#1b5e20" if slope >= 0 else "#c62828"
+            self._card_tend_saldo._lbl.setText(f"{fmt_valor(slope)} por período  ({sinal})")
+        self._card_tend_saldo.setStyleSheet(
+            f"QFrame{{background:#f5f5f5;border:2px solid {cor};border-radius:8px;}}")
+        self._card_tend_saldo._lbl.setStyleSheet(
+            f"font-size:22px;font-weight:bold;color:{cor};border:none;")
 
-    def _formatar_eixo(self, ax, fig):
-        ax.tick_params(axis="x", labelrotation=45, labelsize=8)
-        ax.tick_params(axis="y", labelsize=8)
-        ax.grid(True, alpha=0.3)
-        fig.tight_layout()
-
-    def _plot_dim(self, df_filtrado, gran):
-        self._fig_dim.clear()
-        ax = self._fig_dim.add_subplot(111)
-        col = "Categoria" if self._rb_cat.isChecked() else "Sub_Categoria"
+    def _atualizar_card_painel(self, painel, df, n_periodos):
+        col, lst, card = painel["col"], painel["lst"], painel["card"]
         selecionados = [
-            self._lst_dim.item(i).text() for i in range(self._lst_dim.count())
-            if self._lst_dim.item(i).checkState() == Qt.Checked
+            lst.item(i).text() for i in range(lst.count())
+            if lst.item(i).checkState() == Qt.Checked
         ]
-        if selecionados and not df_filtrado.empty:
-            df_sel = df_filtrado[df_filtrado[col].isin(selecionados)]
-            serie = self._agrupar_periodo(df_sel, gran)
-            if not serie.empty:
-                if len(selecionados) == 1:
-                    label = selecionados[0]
-                else:
-                    label = f"Soma de {len(selecionados)} itens"
-                ax.plot(serie.index, serie.values, marker="o",
-                         color="#2E7D32", linewidth=1.8, label=label)
-                self._lbl_tend_dim.setText(self._desenhar_tendencia(ax, serie))
-                ax.legend(fontsize=8, loc="best")
-            else:
-                self._sem_dados(ax)
-                self._lbl_tend_dim.setText("")
-        else:
-            self._sem_dados(ax)
-            self._lbl_tend_dim.setText("")
-        self._formatar_eixo(ax, self._fig_dim)
-        self._canvas_dim.draw()
-
-    def _plot_saldo(self, df_filtrado, gran):
-        self._fig_sal.clear()
-        ax = self._fig_sal.add_subplot(111)
-        serie = self._agrupar_periodo(df_filtrado, gran)
-        if not serie.empty:
-            ax.plot(serie.index, serie.values, marker="o", color="#1565C0",
-                     linewidth=1.8, label="Saldo acumulado")
-            ax.axhline(0, color="#999999", linewidth=0.8)
-            self._lbl_tend_sal.setText(self._desenhar_tendencia(ax, serie))
-            ax.legend(fontsize=8, loc="best")
-        else:
-            self._sem_dados(ax)
-            self._lbl_tend_sal.setText("")
-        self._formatar_eixo(ax, self._fig_sal)
-        self._canvas_sal.draw()
-
-    def _sem_dados(self, ax):
-        ax.text(0.5, 0.5, "Sem dados para os filtros selecionados",
-                 ha="center", va="center", transform=ax.transAxes,
-                 fontsize=10, color="#999999")
+        df_sel = df[df[col].isin(selecionados)] if selecionados else df.iloc[0:0]
+        total = df_sel["Valor"].sum()
+        media = total / n_periodos if n_periodos else 0.0
+        cor = "#1b5e20" if media >= 0 else "#c62828"
+        card._lbl_media.setStyleSheet(f"font-size:16px;font-weight:bold;color:{cor};border:none;")
+        card._lbl_media.setText(fmt_valor(media))
+        card._lbl_total.setText(f"Total no período: {fmt_valor(total)}")
 
     def _preencher(self):
-        if not hasattr(self, "_df_full") or not MATPLOTLIB_OK:
+        if not hasattr(self, "_df_full"):
             return
         df = self._df_full.copy()
         if self._f_ano.currentText() != "(todos)":
@@ -3108,13 +3066,10 @@ class AbaEvolucao(QWidget):
             df = df[(df["_DataDT"].dt.date >= de) & (df["_DataDT"].dt.date <= ate)]
 
         gran = self._cb_gran.currentText()
-        try:
-            self._plot_dim(df, gran)
-            self._plot_saldo(df, gran)
-        except Exception as e:
-            erro = f"Erro ao desenhar o gráfico:\n{type(e).__name__}: {e}"
-            self._lbl_tend_dim.setText(erro)
-            self._lbl_tend_sal.setText(erro)
+        self._atualizar_card_destaque(df, gran)
+        n_periodos = self._contar_periodos(df, gran)
+        for painel in self._paineis:
+            self._atualizar_card_painel(painel, df, n_periodos)
 
 
 class MainWindow(QMainWindow):
@@ -3142,14 +3097,14 @@ class MainWindow(QMainWindow):
         self._aba_categorias = AbaCategorias(self._aba_form)
         self._aba_pivot      = AbaPivot()
         self._aba_dash       = AbaDashboard()
-        self._aba_evolucao   = AbaEvolucao()
+        self._aba_tendencias = AbaTendencias()
 
         tabs.addTab(self._aba_form,       "  Dados  ")
         tabs.addTab(self._aba_import,     "  Importar  ")
         tabs.addTab(self._aba_categorias, "  Categorias  ")
         tabs.addTab(self._aba_pivot,      "  Tabela Dinâmica  ")
         tabs.addTab(self._aba_dash,       "  Dashboard  ")
-        tabs.addTab(self._aba_evolucao,   "  Evolução  ")
+        tabs.addTab(self._aba_tendencias, "  Tendências  ")
         tabs.currentChanged.connect(self._on_tab)
 
         self.setCentralWidget(tabs)
@@ -3176,7 +3131,7 @@ class MainWindow(QMainWindow):
         if idx == 4:
             self._aba_dash.atualizar()
         if idx == 5:
-            self._aba_evolucao.atualizar()
+            self._aba_tendencias.atualizar()
 
 
 # ═══════════════════════════════════════════════════════════
