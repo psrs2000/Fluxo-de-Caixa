@@ -3064,8 +3064,10 @@ class AbaEvolucao(QWidget):
                 self._lbl_tend_dim.setText(self._desenhar_tendencia(ax, serie))
                 ax.legend(fontsize=8, loc="best")
             else:
+                self._sem_dados(ax)
                 self._lbl_tend_dim.setText("")
         else:
+            self._sem_dados(ax)
             self._lbl_tend_dim.setText("")
         self._formatar_eixo(ax, self._fig_dim)
         self._canvas_dim.draw()
@@ -3081,9 +3083,15 @@ class AbaEvolucao(QWidget):
             self._lbl_tend_sal.setText(self._desenhar_tendencia(ax, serie))
             ax.legend(fontsize=8, loc="best")
         else:
+            self._sem_dados(ax)
             self._lbl_tend_sal.setText("")
         self._formatar_eixo(ax, self._fig_sal)
         self._canvas_sal.draw()
+
+    def _sem_dados(self, ax):
+        ax.text(0.5, 0.5, "Sem dados para os filtros selecionados",
+                 ha="center", va="center", transform=ax.transAxes,
+                 fontsize=10, color="#999999")
 
     def _preencher(self):
         if not hasattr(self, "_df_full") or not MATPLOTLIB_OK:
