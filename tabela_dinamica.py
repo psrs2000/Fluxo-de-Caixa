@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import (
     QInputDialog, QDialog, QDialogButtonBox,
 )
 from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel, QDate
-from PyQt5.QtGui import QColor, QBrush, QFont, QPalette
+from PyQt5.QtGui import QColor, QBrush, QFont
 
 def _app_dir() -> str:
     """Retorna a pasta do .exe (quando compilado) ou do .py (em desenvolvimento)."""
@@ -73,27 +73,6 @@ COLOR_ZERO  = QColor("#424242")   # cinza
 BG_GRUPO    = QColor("#dce8f5")   # azul claro
 BG_TOTAL    = QColor("#c8e6c9")   # verde claro
 BG_ALT      = QColor("#f9f9f9")   # alternado
-
-PALETA_CLARA = None   # capturada em tempo de execução, antes de aplicar temas
-
-
-def _paleta_escura() -> QPalette:
-    pal = QPalette()
-    pal.setColor(QPalette.Window,          QColor(53, 53, 53))
-    pal.setColor(QPalette.WindowText,      Qt.white)
-    pal.setColor(QPalette.Base,            QColor(35, 35, 35))
-    pal.setColor(QPalette.AlternateBase,   QColor(53, 53, 53))
-    pal.setColor(QPalette.ToolTipBase,     Qt.white)
-    pal.setColor(QPalette.ToolTipText,     Qt.white)
-    pal.setColor(QPalette.Text,            Qt.white)
-    pal.setColor(QPalette.Button,          QColor(53, 53, 53))
-    pal.setColor(QPalette.ButtonText,      Qt.white)
-    pal.setColor(QPalette.BrightText,      Qt.red)
-    pal.setColor(QPalette.Link,            QColor(42, 130, 218))
-    pal.setColor(QPalette.Highlight,       QColor(42, 130, 218))
-    pal.setColor(QPalette.HighlightedText, Qt.black)
-    return pal
-
 
 # ═══════════════════════════════════════════════════════════
 #  AUTENTICAÇÃO (senha de acesso ao programa)
@@ -3184,19 +3163,6 @@ class AbaConfiguracoes(QWidget):
         root.addWidget(grp_senha)
         self._atualizar_status_senha()
 
-        # ── Tema visual ──────────────────────────────────────
-        grp_tema = QGroupBox("Tema Visual")
-        lay_tema = QHBoxLayout(grp_tema)
-        lay_tema.addWidget(QLabel("Tema:"))
-        self._cb_tema = QComboBox()
-        self._cb_tema.addItems(["Claro", "Escuro"])
-        cfg_tema = cfg_load().get("tema", "Claro")
-        self._cb_tema.setCurrentText(cfg_tema if cfg_tema in ("Claro", "Escuro") else "Claro")
-        self._cb_tema.currentTextChanged.connect(self._mudar_tema)
-        lay_tema.addWidget(self._cb_tema)
-        lay_tema.addStretch()
-        root.addWidget(grp_tema)
-
         # ── Backup ───────────────────────────────────────────
         grp_backup = QGroupBox("Backup")
         lay_backup = QHBoxLayout(grp_backup)
@@ -3275,27 +3241,18 @@ class AbaConfiguracoes(QWidget):
         self._atualizar_status_senha()
         QMessageBox.information(self, "Senha", "Senha removida.")
 
-    # ── tema visual ────────────────────────────────────────
-    def _mudar_tema(self, nome):
-        cfg_save({"tema": nome})
-        app = QApplication.instance()
-        if not app:
-            return
-        if nome == "Escuro":
-            app.setPalette(_paleta_escura())
-        elif PALETA_CLARA is not None:
-            app.setPalette(PALETA_CLARA)
-
     # ── backup ─────────────────────────────────────────────
     def _fazer_backup(self):
+        pasta = cfg_load().get("backup_dir") or os.path.dirname(DB_PATH)
         sugestao = f"backup_dados_{datetime.datetime.now():%Y%m%d_%H%M%S}.db"
         destino, _ = QFileDialog.getSaveFileName(
-            self, "Salvar backup", os.path.join(os.path.dirname(DB_PATH), sugestao),
+            self, "Salvar backup", os.path.join(pasta, sugestao),
             "Banco de dados (*.db)")
         if not destino:
             return
         try:
             shutil.copy2(DB_PATH, destino)
+            cfg_save({"backup_dir": os.path.dirname(destino)})
             QMessageBox.information(self, "Backup", f"Backup salvo em:\n{destino}")
         except Exception as e:
             QMessageBox.critical(self, "Backup", f"Erro ao salvar backup:\n{e}")
@@ -3384,9 +3341,6 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    PALETA_CLARA = QPalette(app.palette())
-    if _cfg_inicial.get("tema") == "Escuro":
-        app.setPalette(_paleta_escura())
 
     if not _verificar_login():
         sys.exit(0)
