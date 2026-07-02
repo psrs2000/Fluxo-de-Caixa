@@ -2380,6 +2380,10 @@ class AbaPivot(QWidget):
         # Interativas: o usuário pode arrastar p/ um ajuste pontual, que é
         # re-otimizado na próxima mudança (filtro, ordenação, dimensão...).
         hdr = self._tree.header()
+        # desliga o "esticar última coluna": senão a coluna Total Geral (que
+        # costuma ter os maiores números) ignora o auto-ajuste, estica para
+        # preencher o espaço e, quando espremida, trunca o valor ("3.300...").
+        hdr.setStretchLastSection(False)
         for c in range(len(hdrs)):
             hdr.setSectionResizeMode(c, QHeaderView.Interactive)
             self._tree.resizeColumnToContents(c)
