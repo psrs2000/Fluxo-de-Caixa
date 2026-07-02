@@ -260,15 +260,15 @@ Isso é ótimo, por exemplo, para responder rapidamente: **"qual foi minha categ
 
 Quando você usa uma "Linha 2 (subgrupo)", cada grupo da Linha 1 fica expansível (clique na seta ▶ ao lado dele, ou use os botões **"▼ Expandir Tudo"** / **"▶ Recolher Tudo"** no topo da tabela).
 
-### 6.8 Ajustando a largura das colunas
+### 6.8 Largura das colunas
 
-Quando os valores são grandes, uma coluna pode ficar estreita demais e o número aparecer cortado (ex.: `3.300…`), ou a tabela pode ficar mais larga que a tela. Para resolver, **arraste a borda entre os cabeçalhos das colunas**: aponte o mouse na linha que separa dois títulos de coluna e arraste para a esquerda (estreitar) ou para a direita (alargar). Assim você pode estreitar as colunas menos importantes e alargar as que precisa ver por inteiro, deixando tudo bem visível na tela.
+Você **não precisa se preocupar** com a largura das colunas: a cada mudança na tela (trocar dimensão, aplicar um filtro, ordenar etc.), o programa **recalcula automaticamente a largura ideal de cada coluna**, ajustando-a ao conteúdo — do mesmo jeito que aconteceria se você desse um duplo-clique na borda de cada coluna. Assim os números aparecem sempre por inteiro (sem o `3.300…`) e a tabela fica na melhor configuração possível.
 
-A largura que você escolher é **salva automaticamente** e restaurada nas próximas vezes — inclusive depois de ordenar, mudar um filtro ou reabrir o programa.
+Se ainda assim quiser um ajuste pontual, você pode **arrastar a borda entre dois cabeçalhos de coluna** para estreitar ou alargar manualmente. Esse ajuste manual vale para a visualização atual; na próxima mudança, o programa volta a otimizar as larguras sozinho.
 
 ### 6.9 Tudo é salvo automaticamente
 
-Toda a configuração desta aba — quais dimensões você escolheu, quais filtros, quais itens excluiu, a ordenação, as larguras das colunas e até quais grupos estavam expandidos — é **lembrada automaticamente** entre uma sessão e outra do programa, exceto as datas de período (que sempre voltam para a data de hoje, por segurança).
+Toda a configuração desta aba — quais dimensões você escolheu, quais filtros, quais itens excluiu, a ordenação e até quais grupos estavam expandidos — é **lembrada automaticamente** entre uma sessão e outra do programa, exceto as datas de período (que sempre voltam para a data de hoje, por segurança).
 
 ---
 
