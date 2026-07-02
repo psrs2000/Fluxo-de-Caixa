@@ -1,4 +1,4 @@
-# Manual do Usuário — Tabela Dinâmica
+# Manual do Usuário — Fluxo de Caixa
 
 ### Seu controle financeiro pessoal, com o poder de uma Tabela Dinâmica do Excel
 
@@ -24,7 +24,7 @@
 
 ## 1. O que é este programa e para quem ele serve
 
-O **Tabela Dinâmica** é um programa de controle financeiro pessoal (ou de pequenos negócios) que funciona como um "Excel especializado": você lança suas entradas e saídas de dinheiro, e o programa cruza esses dados de todas as formas possíveis — por categoria, por mês, por ano, por tipo de transação — automaticamente, sem você precisar escrever nenhuma fórmula.
+O **Fluxo de Caixa** é um programa de controle financeiro pessoal (ou de pequenos negócios) que funciona como um "Excel especializado": você lança suas entradas e saídas de dinheiro, e o programa cruza esses dados de todas as formas possíveis — por categoria, por mês, por ano, por tipo de transação — automaticamente, sem você precisar escrever nenhuma fórmula.
 
 Se você já usou uma **Tabela Dinâmica** (Pivot Table) no Excel, vai se sentir em casa. Se nunca usou, não se preocupe: este manual explica tudo do zero, com exemplos práticos.
 
@@ -257,9 +257,15 @@ Isso é ótimo, por exemplo, para responder rapidamente: **"qual foi minha categ
 
 Quando você usa uma "Linha 2 (subgrupo)", cada grupo da Linha 1 fica expansível (clique na seta ▶ ao lado dele, ou use os botões **"▼ Expandir Tudo"** / **"▶ Recolher Tudo"** no topo da tabela).
 
-### 6.8 Tudo é salvo automaticamente
+### 6.8 Ajustando a largura das colunas
 
-Toda a configuração desta aba — quais dimensões você escolheu, quais filtros, quais itens excluiu, a ordenação e até quais grupos estavam expandidos — é **lembrada automaticamente** entre uma sessão e outra do programa, exceto as datas de período (que sempre voltam para a data de hoje, por segurança).
+Quando os valores são grandes, uma coluna pode ficar estreita demais e o número aparecer cortado (ex.: `3.300…`), ou a tabela pode ficar mais larga que a tela. Para resolver, **arraste a borda entre os cabeçalhos das colunas**: aponte o mouse na linha que separa dois títulos de coluna e arraste para a esquerda (estreitar) ou para a direita (alargar). Assim você pode estreitar as colunas menos importantes e alargar as que precisa ver por inteiro, deixando tudo bem visível na tela.
+
+A largura que você escolher é **salva automaticamente** e restaurada nas próximas vezes — inclusive depois de ordenar, mudar um filtro ou reabrir o programa.
+
+### 6.9 Tudo é salvo automaticamente
+
+Toda a configuração desta aba — quais dimensões você escolheu, quais filtros, quais itens excluiu, a ordenação, as larguras das colunas e até quais grupos estavam expandidos — é **lembrada automaticamente** entre uma sessão e outra do programa, exceto as datas de período (que sempre voltam para a data de hoje, por segurança).
 
 ---
 
@@ -449,4 +455,4 @@ Não existe recuperação automática de senha. É necessário abrir o arquivo `
 
 ---
 
-*Este manual foi elaborado para acompanhar o programa Tabela Dinâmica. Em caso de dúvidas que não foram esclarecidas aqui, revise as seções correspondentes ou entre em contato com quem lhe forneceu o programa.*
+*Este manual foi elaborado para acompanhar o programa Fluxo de Caixa. Em caso de dúvidas que não foram esclarecidas aqui, revise as seções correspondentes ou entre em contato com quem lhe forneceu o programa.*

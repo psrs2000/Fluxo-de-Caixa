@@ -3299,7 +3299,7 @@ class AbaConfiguracoes(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Tabela Dinâmica")
+        self.setWindowTitle("Fluxo de Caixa")
         self.setMinimumSize(800, 560)
 
         # restaurar geometria salva
