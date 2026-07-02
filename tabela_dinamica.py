@@ -1958,6 +1958,9 @@ class AbaPivot(QWidget):
         hdr.setSectionsClickable(True)
         hdr.setSortIndicatorShown(True)
         hdr.sectionClicked.connect(self._on_header_click)
+        # redimensionamento manual das colunas (largura fica salva por layout)
+        self._gerando = False
+        hdr.sectionResized.connect(self._on_col_resized)
         root.addWidget(self._tree, 1)
 
         self._status = QLabel("")
@@ -2089,6 +2092,21 @@ class AbaPivot(QWidget):
             self._sort_desc = True                  # nova coluna: maior→menor
         self._gerar()
 
+    # ── redimensionamento manual de coluna (salva por layout) ──
+    def _on_col_resized(self, *_):
+        # ignora as mudanças programáticas feitas durante _gerar
+        if getattr(self, "_gerando", False):
+            return
+        n = self._tree.columnCount()
+        if n == 0:
+            return
+        hdr_item = self._tree.headerItem()
+        assinatura = " | ".join(hdr_item.text(c) for c in range(n))
+        larguras = [self._tree.columnWidth(c) for c in range(n)]
+        todas = dict(cfg_load().get("pivot_col_widths", {}))
+        todas[assinatura] = larguras
+        cfg_save({"pivot_col_widths": todas})
+
     # ── estado de expansão dos grupos ────────────────────
     def _on_expansao(self, item: QTreeWidgetItem, expandido: bool):
         nome = item.text(0)
@@ -2148,6 +2166,13 @@ class AbaPivot(QWidget):
 
     # ── gerar ─────────────────────────────────────────────
     def _gerar(self):
+        self._gerando = True
+        try:
+            self._gerar_interno()
+        finally:
+            self._gerando = False
+
+    def _gerar_interno(self):
         self._atualizar_filtros()
         df = self._carregar_df()
         if df is None:
@@ -2373,10 +2398,23 @@ class AbaPivot(QWidget):
             export_rows.append(["Total Geral"] + gt_strs)
 
         self._export_rows = export_rows
-        # auto-ajuste da coluna de rótulo; demais via ResizeToContents
-        self._tree.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        for c in range(1, len(hdrs)):
-            self._tree.header().setSectionResizeMode(c, QHeaderView.ResizeToContents)
+        # ── larguras das colunas ──────────────────────────
+        # Colunas Interativas: o usuário pode arrastar para redimensionar.
+        # Largura inicial = auto-ajuste ao conteúdo (com folga p/ não truncar
+        # números em negrito); o rótulo é limitado p/ não dominar a tela.
+        # Se houver larguras salvas para este mesmo layout, elas têm prioridade.
+        hdr = self._tree.header()
+        for c in range(len(hdrs)):
+            hdr.setSectionResizeMode(c, QHeaderView.Interactive)
+            self._tree.resizeColumnToContents(c)
+            largura = self._tree.columnWidth(c) + 20
+            if c == 0:
+                largura = min(largura, 300)
+            self._tree.setColumnWidth(c, largura)
+        larguras_salvas = cfg_load().get("pivot_col_widths", {}).get(" | ".join(hdrs))
+        if larguras_salvas and len(larguras_salvas) == len(hdrs):
+            for c, w in enumerate(larguras_salvas):
+                self._tree.setColumnWidth(c, int(w))
         self._status.setText(
             f"{len(grupos)} grupos  |  {len(df)} registros  |  agreg: {agg}"
             + ("  —  clique no ▶ para expandir" if use_row2 else ""))
