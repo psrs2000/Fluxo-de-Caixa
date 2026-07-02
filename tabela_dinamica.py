@@ -29,7 +29,7 @@ from PyQt5.QtWidgets import (
     QMenu, QWidgetAction, QDateEdit, QListWidget, QListWidgetItem,
     QInputDialog, QDialog, QDialogButtonBox,
 )
-from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel, QDate
+from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel, QDate, QTimer
 from PyQt5.QtGui import QColor, QBrush, QFont
 
 def _app_dir() -> str:
@@ -2089,6 +2089,22 @@ class AbaPivot(QWidget):
             self._sort_desc = True                  # nova coluna: maior→menor
         self._gerar()
 
+    # ── auto-ajuste das larguras (o "duplo-clique" automático) ──
+    def _ajustar_larguras_colunas(self):
+        tree = self._tree
+        n = tree.columnCount()
+        if n == 0:
+            return
+        hdr = tree.header()
+        # desliga o "esticar última coluna": senão a coluna Total Geral (que
+        # costuma ter os maiores números) ignoraria o auto-ajuste, esticando
+        # para preencher o espaço e truncando o valor quando espremida.
+        hdr.setStretchLastSection(False)
+        for c in range(n):
+            hdr.setSectionResizeMode(c, QHeaderView.Interactive)
+            tree.resizeColumnToContents(c)
+            tree.setColumnWidth(c, tree.columnWidth(c) + 16)
+
     # ── estado de expansão dos grupos ────────────────────
     def _on_expansao(self, item: QTreeWidgetItem, expandido: bool):
         nome = item.text(0)
@@ -2374,20 +2390,11 @@ class AbaPivot(QWidget):
 
         self._export_rows = export_rows
         # ── larguras das colunas ──────────────────────────
-        # A cada geração, recalcula a largura ideal de cada coluna ajustando
-        # ao conteúdo (equivalente ao "duplo-clique" na borda), com uma pequena
-        # folga p/ não truncar números em negrito. As colunas continuam
-        # Interativas: o usuário pode arrastar p/ um ajuste pontual, que é
-        # re-otimizado na próxima mudança (filtro, ordenação, dimensão...).
-        hdr = self._tree.header()
-        # desliga o "esticar última coluna": senão a coluna Total Geral (que
-        # costuma ter os maiores números) ignora o auto-ajuste, estica para
-        # preencher o espaço e, quando espremida, trunca o valor ("3.300...").
-        hdr.setStretchLastSection(False)
-        for c in range(len(hdrs)):
-            hdr.setSectionResizeMode(c, QHeaderView.Interactive)
-            self._tree.resizeColumnToContents(c)
-            self._tree.setColumnWidth(c, self._tree.columnWidth(c) + 16)
+        # O ajuste é ADIADO com QTimer.singleShot(0): se calcularmos a largura
+        # agora, o Qt ainda não terminou de desenhar as linhas e o cálculo sai
+        # errado (é o motivo de só o "duplo-clique" manual acertar). Adiando,
+        # ele roda logo após o desenho — o mesmo resultado do duplo-clique.
+        QTimer.singleShot(0, self._ajustar_larguras_colunas)
         self._status.setText(
             f"{len(grupos)} grupos  |  {len(df)} registros  |  agreg: {agg}"
             + ("  —  clique no ▶ para expandir" if use_row2 else ""))
