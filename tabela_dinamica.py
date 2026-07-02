@@ -2107,8 +2107,9 @@ class AbaPivot(QWidget):
         hdr.setStretchLastSection(False)
         for c in range(n):
             hdr.setSectionResizeMode(c, QHeaderView.Interactive)
+            # exatamente o que o duplo-clique na borda faz: ajusta ao conteúdo,
+            # sem somar folga (somar deixava a coluna mais larga que o ideal).
             tree.resizeColumnToContents(c)
-            tree.setColumnWidth(c, tree.columnWidth(c) + 24)
 
     # ── estado de expansão dos grupos ────────────────────
     def _on_expansao(self, item: QTreeWidgetItem, expandido: bool):
