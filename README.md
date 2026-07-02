@@ -260,11 +260,11 @@ Isso é ótimo, por exemplo, para responder rapidamente: **"qual foi minha categ
 
 Quando você usa uma "Linha 2 (subgrupo)", cada grupo da Linha 1 fica expansível (clique na seta ▶ ao lado dele, ou use os botões **"▼ Expandir Tudo"** / **"▶ Recolher Tudo"** no topo da tabela).
 
-### 6.8 Largura das colunas
+### 6.8 Ajustando a largura das colunas
 
-Você **não precisa se preocupar** com a largura das colunas: a cada mudança na tela (trocar dimensão, aplicar um filtro, ordenar etc.), o programa **recalcula automaticamente a largura ideal de cada coluna**, ajustando-a ao conteúdo — do mesmo jeito que aconteceria se você desse um duplo-clique na borda de cada coluna. Assim os números aparecem sempre por inteiro (sem o `3.300…`) e a tabela fica na melhor configuração possível.
+Quando os valores são grandes, uma coluna pode ficar estreita demais e o número aparecer cortado (ex.: `3.300…`). Para deixar tudo na largura ideal, clique no botão **"↔ Ajustar Colunas"** (ao lado de "Recolher Tudo", no topo da tabela): ele ajusta **todas as colunas de uma vez** ao tamanho do conteúdo, deixando os números por inteiro — como se você desse um duplo-clique na borda de cada coluna.
 
-Se ainda assim quiser um ajuste pontual, você pode **arrastar a borda entre dois cabeçalhos de coluna** para estreitar ou alargar manualmente. Esse ajuste manual vale para a visualização atual; na próxima mudança, o programa volta a otimizar as larguras sozinho.
+Você também pode ajustar **uma** coluna específica: aponte o mouse na linha que separa dois títulos de coluna e **dê um duplo-clique** (ajusta ao conteúdo) ou **arraste** para a largura que preferir.
 
 ### 6.9 Tudo é salvo automaticamente
 

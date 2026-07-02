@@ -29,7 +29,7 @@ from PyQt5.QtWidgets import (
     QMenu, QWidgetAction, QDateEdit, QListWidget, QListWidgetItem,
     QInputDialog, QDialog, QDialogButtonBox,
 )
-from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel, QDate, QTimer
+from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel, QDate
 from PyQt5.QtGui import QColor, QBrush, QFont
 
 def _app_dir() -> str:
@@ -1933,13 +1933,18 @@ class AbaPivot(QWidget):
         btn_tree_row = QHBoxLayout()
         btn_exp = QPushButton("▼  Expandir Tudo")
         btn_rec = QPushButton("▶  Recolher Tudo")
+        btn_fit = QPushButton("↔  Ajustar Colunas")
         for b in (btn_exp, btn_rec):
             b.setFixedHeight(28)
             b.setFixedWidth(150)
+        btn_fit.setFixedHeight(28)
+        btn_fit.setFixedWidth(160)
         btn_exp.clicked.connect(lambda: self._tree.expandAll())
         btn_rec.clicked.connect(lambda: self._tree.collapseAll())
+        btn_fit.clicked.connect(self._ajustar_larguras_colunas)
         btn_tree_row.addWidget(btn_exp)
         btn_tree_row.addWidget(btn_rec)
+        btn_tree_row.addWidget(btn_fit)
         btn_tree_row.addStretch()
         root.addLayout(btn_tree_row)
 
@@ -2103,7 +2108,7 @@ class AbaPivot(QWidget):
         for c in range(n):
             hdr.setSectionResizeMode(c, QHeaderView.Interactive)
             tree.resizeColumnToContents(c)
-            tree.setColumnWidth(c, tree.columnWidth(c) + 16)
+            tree.setColumnWidth(c, tree.columnWidth(c) + 24)
 
     # ── estado de expansão dos grupos ────────────────────
     def _on_expansao(self, item: QTreeWidgetItem, expandido: bool):
@@ -2389,12 +2394,9 @@ class AbaPivot(QWidget):
             export_rows.append(["Total Geral"] + gt_strs)
 
         self._export_rows = export_rows
-        # ── larguras das colunas ──────────────────────────
-        # O ajuste é ADIADO com QTimer.singleShot(0): se calcularmos a largura
-        # agora, o Qt ainda não terminou de desenhar as linhas e o cálculo sai
-        # errado (é o motivo de só o "duplo-clique" manual acertar). Adiando,
-        # ele roda logo após o desenho — o mesmo resultado do duplo-clique.
-        QTimer.singleShot(0, self._ajustar_larguras_colunas)
+        # As colunas ficam Interativas com larguras-padrão (definidas acima).
+        # O usuário ajusta a largura ideal quando quiser, pelo botão
+        # "Ajustar Colunas" (ou arrastando a borda / dando duplo-clique nela).
         self._status.setText(
             f"{len(grupos)} grupos  |  {len(df)} registros  |  agreg: {agg}"
             + ("  —  clique no ▶ para expandir" if use_row2 else ""))
