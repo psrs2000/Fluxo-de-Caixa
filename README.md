@@ -336,7 +336,7 @@ Este cartão, em destaque, mostra o seu **saldo médio por período**: soma tudo
 
 ### 8.3 Os três painéis: Categoria, Sub-Categoria e Transação
 
-Iguais em formato aos painéis do Dashboard, mas com **checkboxes** ao lado de cada item:
+Iguais em formato aos painéis do Dashboard, mas com **checkboxes** ao lado de cada item. Os itens começam **todos desmarcados** — assim você marca apenas o que quer analisar:
 
 - Marque **um item** para ver a média só dele.
 - Marque **vários itens** para que o programa **some os valores de todos os marcados** e calcule a média do conjunto, como se fosse um único grupo (ex: somar "Supermercado" + "Restaurante" para ver a média combinada de alimentação).

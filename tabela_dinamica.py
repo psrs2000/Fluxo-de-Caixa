@@ -3034,7 +3034,9 @@ class AbaTendencias(QWidget):
                 for v in valores:
                     item = QListWidgetItem(str(v))
                     item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                    marcado = (not antigos_marcados) or (str(v) in antigos_marcados)
+                    # padrão: itens desmarcados; mantém marcados só os que o
+                    # usuário já havia selecionado (ao recarregar a lista)
+                    marcado = str(v) in antigos_marcados
                     item.setCheckState(Qt.Checked if marcado else Qt.Unchecked)
                     lst.addItem(item)
             lst.blockSignals(False)
