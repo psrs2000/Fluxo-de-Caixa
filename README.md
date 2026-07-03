@@ -266,9 +266,11 @@ Quando os valores são grandes, uma coluna pode ficar estreita demais e o númer
 
 Você também pode ajustar **uma** coluna específica: aponte o mouse na linha que separa dois títulos de coluna e **dê um duplo-clique** (ajusta ao conteúdo) ou **arraste** para a largura que preferir.
 
+As larguras que você definir (pelo botão ou arrastando) ficam **salvas** e são **restauradas automaticamente** quando você muda um filtro, ordena, troca de dimensão ou reabre o programa — ou seja, você não precisa reajustar as colunas toda hora. Cada combinação de colunas guarda a sua própria configuração de larguras.
+
 ### 6.9 Tudo é salvo automaticamente
 
-Toda a configuração desta aba — quais dimensões você escolheu, quais filtros, quais itens excluiu, a ordenação e até quais grupos estavam expandidos — é **lembrada automaticamente** entre uma sessão e outra do programa, exceto as datas de período (que sempre voltam para a data de hoje, por segurança).
+Toda a configuração desta aba — quais dimensões você escolheu, quais filtros, quais itens excluiu, a ordenação, as larguras das colunas e até quais grupos estavam expandidos — é **lembrada automaticamente** entre uma sessão e outra do programa, exceto as datas de período (que sempre voltam para a data de hoje, por segurança).
 
 ---
 

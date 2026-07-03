@@ -1963,6 +1963,10 @@ class AbaPivot(QWidget):
         hdr.setSectionsClickable(True)
         hdr.setSortIndicatorShown(True)
         hdr.sectionClicked.connect(self._on_header_click)
+        # persistência das larguras: salva o que o usuário arrastar; a flag
+        # _gerando evita salvar as mudanças programáticas feitas durante _gerar
+        self._gerando = False
+        hdr.sectionResized.connect(self._on_col_resized)
         root.addWidget(self._tree, 1)
 
         self._status = QLabel("")
@@ -2094,7 +2098,7 @@ class AbaPivot(QWidget):
             self._sort_desc = True                  # nova coluna: maior→menor
         self._gerar()
 
-    # ── auto-ajuste das larguras (o "duplo-clique" automático) ──
+    # ── botão "Ajustar Colunas": ajusta ao conteúdo e salva ──
     def _ajustar_larguras_colunas(self):
         tree = self._tree
         n = tree.columnCount()
@@ -2102,14 +2106,38 @@ class AbaPivot(QWidget):
             return
         hdr = tree.header()
         # desliga o "esticar última coluna": senão a coluna Total Geral (que
-        # costuma ter os maiores números) ignoraria o auto-ajuste, esticando
-        # para preencher o espaço e truncando o valor quando espremida.
+        # costuma ter os maiores números) ignoraria o ajuste, esticando para
+        # preencher o espaço e truncando o valor quando espremida.
         hdr.setStretchLastSection(False)
-        for c in range(n):
-            hdr.setSectionResizeMode(c, QHeaderView.Interactive)
-            # exatamente o que o duplo-clique na borda faz: ajusta ao conteúdo,
-            # sem somar folga (somar deixava a coluna mais larga que o ideal).
-            tree.resizeColumnToContents(c)
+        # ajusta cada coluna ao conteúdo — exatamente o que o duplo-clique na
+        # borda faz, sem somar folga. A flag evita salvar coluna a coluna;
+        # salvamos uma vez só, no fim.
+        self._gerando = True
+        try:
+            for c in range(n):
+                hdr.setSectionResizeMode(c, QHeaderView.Interactive)
+                tree.resizeColumnToContents(c)
+        finally:
+            self._gerando = False
+        self._salvar_larguras()
+
+    # ── persistência das larguras (por layout de colunas) ──
+    def _salvar_larguras(self):
+        tree = self._tree
+        n = tree.columnCount()
+        if n == 0:
+            return
+        assinatura = " | ".join(tree.headerItem().text(c) for c in range(n))
+        larguras = [tree.columnWidth(c) for c in range(n)]
+        todas = dict(cfg_load().get("pivot_col_widths", {}))
+        todas[assinatura] = larguras
+        cfg_save({"pivot_col_widths": todas})
+
+    def _on_col_resized(self, *_):
+        # só salva quando é ajuste manual do usuário (não durante _gerar/botão)
+        if getattr(self, "_gerando", False):
+            return
+        self._salvar_larguras()
 
     # ── estado de expansão dos grupos ────────────────────
     def _on_expansao(self, item: QTreeWidgetItem, expandido: bool):
@@ -2170,6 +2198,15 @@ class AbaPivot(QWidget):
 
     # ── gerar ─────────────────────────────────────────────
     def _gerar(self):
+        # a flag evita que as larguras definidas programaticamente aqui sejam
+        # tratadas como ajuste manual do usuário (e re-salvas) por _on_col_resized
+        self._gerando = True
+        try:
+            self._gerar_interno()
+        finally:
+            self._gerando = False
+
+    def _gerar_interno(self):
         self._atualizar_filtros()
         df = self._carregar_df()
         if df is None:
@@ -2395,9 +2432,17 @@ class AbaPivot(QWidget):
             export_rows.append(["Total Geral"] + gt_strs)
 
         self._export_rows = export_rows
+        # ── larguras das colunas ──────────────────────────
         # As colunas ficam Interativas com larguras-padrão (definidas acima).
-        # O usuário ajusta a largura ideal quando quiser, pelo botão
-        # "Ajustar Colunas" (ou arrastando a borda / dando duplo-clique nela).
+        # Se o usuário já tiver ajustado as larguras deste layout (arrastando
+        # ou pelo botão "Ajustar Colunas"), elas são restauradas aqui — assim
+        # o ajuste "gruda" entre mudanças de filtro/ordenação e reaberturas.
+        hdr = self._tree.header()
+        hdr.setStretchLastSection(False)
+        larguras_salvas = cfg_load().get("pivot_col_widths", {}).get(" | ".join(hdrs))
+        if larguras_salvas and len(larguras_salvas) == len(hdrs):
+            for c, w in enumerate(larguras_salvas):
+                self._tree.setColumnWidth(c, int(w))
         self._status.setText(
             f"{len(grupos)} grupos  |  {len(df)} registros  |  agreg: {agg}"
             + ("  —  clique no ▶ para expandir" if use_row2 else ""))
