@@ -1854,12 +1854,10 @@ class AbaPivot(QWidget):
         self._agg.setFixedWidth(90)
         lay_str.addWidget(self._agg, 1, 1)
 
-        self._chk_sub = QCheckBox("Subtotais"); self._chk_sub.setChecked(True)
-        lay_str.addWidget(self._chk_sub, 1, 3, 1, 2)
         self._chk_total = QCheckBox("Total Geral"); self._chk_total.setChecked(True)
-        lay_str.addWidget(self._chk_total, 1, 5, 1, 2)
+        lay_str.addWidget(self._chk_total, 1, 3, 1, 2)
         self._chk_pct = QCheckBox("Mostrar como %"); self._chk_pct.setChecked(False)
-        lay_str.addWidget(self._chk_pct, 1, 7)
+        lay_str.addWidget(self._chk_pct, 1, 5, 1, 2)
         root.addWidget(grp_str)
 
         # sets de exclusão e estado de expansão (populados dinamicamente)
@@ -1933,13 +1931,18 @@ class AbaPivot(QWidget):
         btn_tree_row = QHBoxLayout()
         btn_exp = QPushButton("▼  Expandir Tudo")
         btn_rec = QPushButton("▶  Recolher Tudo")
+        btn_fit = QPushButton("↔  Ajustar Colunas")
         for b in (btn_exp, btn_rec):
             b.setFixedHeight(28)
             b.setFixedWidth(150)
+        btn_fit.setFixedHeight(28)
+        btn_fit.setFixedWidth(160)
         btn_exp.clicked.connect(lambda: self._tree.expandAll())
         btn_rec.clicked.connect(lambda: self._tree.collapseAll())
+        btn_fit.clicked.connect(self._ajustar_larguras_colunas)
         btn_tree_row.addWidget(btn_exp)
         btn_tree_row.addWidget(btn_rec)
+        btn_tree_row.addWidget(btn_fit)
         btn_tree_row.addStretch()
         root.addLayout(btn_tree_row)
 
@@ -1958,7 +1961,8 @@ class AbaPivot(QWidget):
         hdr.setSectionsClickable(True)
         hdr.setSortIndicatorShown(True)
         hdr.sectionClicked.connect(self._on_header_click)
-        # redimensionamento manual das colunas (largura fica salva por layout)
+        # persistência das larguras: salva o que o usuário arrastar; a flag
+        # _gerando evita salvar as mudanças programáticas feitas durante _gerar
         self._gerando = False
         hdr.sectionResized.connect(self._on_col_resized)
         root.addWidget(self._tree, 1)
@@ -1971,7 +1975,7 @@ class AbaPivot(QWidget):
         for cb in (self._row1, self._row2, self._cols, self._agg,
                    self._f_ano, self._f_mes, self._f_cat, self._f_tran, self._f_sub):
             cb.currentIndexChanged.connect(self._gerar)
-        for chk in (self._chk_sub, self._chk_total, self._chk_pct):
+        for chk in (self._chk_total, self._chk_pct):
             chk.stateChanged.connect(self._gerar)
         for rb in (self._rb_todos, self._rb_pos, self._rb_neg):
             rb.toggled.connect(self._gerar)
@@ -2044,7 +2048,7 @@ class AbaPivot(QWidget):
         # block signals during restore to avoid multiple _gerar calls
         widgets = [self._row1, self._row2, self._cols, self._agg,
                    self._f_ano, self._f_mes, self._f_cat, self._f_tran, self._f_sub,
-                   self._chk_sub, self._chk_total, self._chk_pct,
+                   self._chk_total, self._chk_pct,
                    self._rb_todos, self._rb_pos, self._rb_neg]
         for w in widgets:
             w.blockSignals(True)
@@ -2060,8 +2064,6 @@ class AbaPivot(QWidget):
                     idx = cb.findText(val)
                     if idx >= 0:
                         cb.setCurrentIndex(idx)
-            if "subtotais" in cfg:
-                self._chk_sub.setChecked(bool(cfg["subtotais"]))
             if "total_geral" in cfg:
                 self._chk_total.setChecked(bool(cfg["total_geral"]))
             if "mostrar_pct" in cfg:
@@ -2092,20 +2094,46 @@ class AbaPivot(QWidget):
             self._sort_desc = True                  # nova coluna: maior→menor
         self._gerar()
 
-    # ── redimensionamento manual de coluna (salva por layout) ──
-    def _on_col_resized(self, *_):
-        # ignora as mudanças programáticas feitas durante _gerar
-        if getattr(self, "_gerando", False):
-            return
-        n = self._tree.columnCount()
+    # ── botão "Ajustar Colunas": ajusta ao conteúdo e salva ──
+    def _ajustar_larguras_colunas(self):
+        tree = self._tree
+        n = tree.columnCount()
         if n == 0:
             return
-        hdr_item = self._tree.headerItem()
-        assinatura = " | ".join(hdr_item.text(c) for c in range(n))
-        larguras = [self._tree.columnWidth(c) for c in range(n)]
+        hdr = tree.header()
+        # desliga o "esticar última coluna": senão a coluna Total Geral (que
+        # costuma ter os maiores números) ignoraria o ajuste, esticando para
+        # preencher o espaço e truncando o valor quando espremida.
+        hdr.setStretchLastSection(False)
+        # ajusta cada coluna ao conteúdo — exatamente o que o duplo-clique na
+        # borda faz, sem somar folga. A flag evita salvar coluna a coluna;
+        # salvamos uma vez só, no fim.
+        self._gerando = True
+        try:
+            for c in range(n):
+                hdr.setSectionResizeMode(c, QHeaderView.Interactive)
+                tree.resizeColumnToContents(c)
+        finally:
+            self._gerando = False
+        self._salvar_larguras()
+
+    # ── persistência das larguras (por layout de colunas) ──
+    def _salvar_larguras(self):
+        tree = self._tree
+        n = tree.columnCount()
+        if n == 0:
+            return
+        assinatura = " | ".join(tree.headerItem().text(c) for c in range(n))
+        larguras = [tree.columnWidth(c) for c in range(n)]
         todas = dict(cfg_load().get("pivot_col_widths", {}))
         todas[assinatura] = larguras
         cfg_save({"pivot_col_widths": todas})
+
+    def _on_col_resized(self, *_):
+        # só salva quando é ajuste manual do usuário (não durante _gerar/botão)
+        if getattr(self, "_gerando", False):
+            return
+        self._salvar_larguras()
 
     # ── estado de expansão dos grupos ────────────────────
     def _on_expansao(self, item: QTreeWidgetItem, expandido: bool):
@@ -2166,6 +2194,8 @@ class AbaPivot(QWidget):
 
     # ── gerar ─────────────────────────────────────────────
     def _gerar(self):
+        # a flag evita que as larguras definidas programaticamente aqui sejam
+        # tratadas como ajuste manual do usuário (e re-salvas) por _on_col_resized
         self._gerando = True
         try:
             self._gerar_interno()
@@ -2399,18 +2429,12 @@ class AbaPivot(QWidget):
 
         self._export_rows = export_rows
         # ── larguras das colunas ──────────────────────────
-        # Colunas Interativas: o usuário pode arrastar para redimensionar.
-        # Largura inicial = auto-ajuste ao conteúdo (com folga p/ não truncar
-        # números em negrito); o rótulo é limitado p/ não dominar a tela.
-        # Se houver larguras salvas para este mesmo layout, elas têm prioridade.
+        # As colunas ficam Interativas com larguras-padrão (definidas acima).
+        # Se o usuário já tiver ajustado as larguras deste layout (arrastando
+        # ou pelo botão "Ajustar Colunas"), elas são restauradas aqui — assim
+        # o ajuste "gruda" entre mudanças de filtro/ordenação e reaberturas.
         hdr = self._tree.header()
-        for c in range(len(hdrs)):
-            hdr.setSectionResizeMode(c, QHeaderView.Interactive)
-            self._tree.resizeColumnToContents(c)
-            largura = self._tree.columnWidth(c) + 20
-            if c == 0:
-                largura = min(largura, 300)
-            self._tree.setColumnWidth(c, largura)
+        hdr.setStretchLastSection(False)
         larguras_salvas = cfg_load().get("pivot_col_widths", {}).get(" | ".join(hdrs))
         if larguras_salvas and len(larguras_salvas) == len(hdrs):
             for c, w in enumerate(larguras_salvas):
@@ -2425,7 +2449,6 @@ class AbaPivot(QWidget):
             "row2":        self._row2.currentText(),
             "cols":        self._cols.currentText(),
             "agg":         self._agg.currentText(),
-            "subtotais":   self._chk_sub.isChecked(),
             "total_geral": self._chk_total.isChecked(),
             "mostrar_pct": self._chk_pct.isChecked(),
             "filtro_valor": "pos" if self._rb_pos.isChecked() else "neg" if self._rb_neg.isChecked() else "todos",
@@ -2905,8 +2928,8 @@ class AbaTendencias(QWidget):
         flt.addStretch()
         root.addLayout(flt)
 
-        # ── card de destaque: tendência do saldo ──────────
-        self._card_tend_saldo = self._make_card_destaque("Tendência do Saldo")
+        # ── card de destaque: saldo médio por período ─────
+        self._card_tend_saldo = self._make_card_destaque("Saldo Médio por Período")
         root.addWidget(self._card_tend_saldo)
 
         # ── 3 painéis: Categoria / Sub-Categoria / Transação
@@ -3006,7 +3029,9 @@ class AbaTendencias(QWidget):
                 for v in valores:
                     item = QListWidgetItem(str(v))
                     item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                    marcado = (not antigos_marcados) or (str(v) in antigos_marcados)
+                    # padrão: itens desmarcados; mantém marcados só os que o
+                    # usuário já havia selecionado (ao recarregar a lista)
+                    marcado = str(v) in antigos_marcados
                     item.setCheckState(Qt.Checked if marcado else Qt.Unchecked)
                     lst.addItem(item)
             lst.blockSignals(False)
@@ -3081,44 +3106,13 @@ class AbaTendencias(QWidget):
             return d[["Ano", "Mes"]].drop_duplicates().shape[0]
         return d["Ano"].drop_duplicates().shape[0]
 
-    def _serie_periodo(self, df, gran):
-        if df.empty:
-            return []
-        d = df.dropna(subset=["Ano", "Mes"]).copy()
-        if d.empty:
-            return []
-        if gran == "Mês":
-            d["_key"] = d["Ano"].astype(int) * 100 + d["Mes"].astype(int)
-        else:
-            d["_key"] = d["Ano"].astype(int)
-        return d.groupby("_key")["Valor"].sum().sort_index().tolist()
-
-    def _slope(self, valores):
-        n = len(valores)
-        if n < 2:
-            return None
-        xs = range(n)
-        mx = sum(xs) / n
-        my = sum(valores) / n
-        num = sum((x - mx) * (y - my) for x, y in zip(xs, valores))
-        den = sum((x - mx) ** 2 for x in xs)
-        return num / den if den else 0.0
-
-    def _atualizar_card_destaque(self, df, gran):
-        serie = self._serie_periodo(df, gran)
-        slope = self._slope(serie)
-        if slope is None:
-            self._card_tend_saldo._lbl.setText("Dados insuficientes para calcular a tendência")
-            cor = "#1565C0"
-        else:
-            if slope > 0.01:
-                sinal = "alta"
-            elif slope < -0.01:
-                sinal = "queda"
-            else:
-                sinal = "estável"
-            cor = "#1b5e20" if slope >= 0 else "#c62828"
-            self._card_tend_saldo._lbl.setText(f"{fmt_valor(slope)} por período  ({sinal})")
+    def _atualizar_card_destaque(self, df, n_periodos):
+        # saldo médio por período = saldo acumulado (soma de tudo) ÷ nº períodos
+        # — mesma lógica dos 3 painéis, aplicada a todos os lançamentos.
+        total = df["Valor"].sum()
+        media = total / n_periodos if n_periodos else 0.0
+        cor = "#1b5e20" if media >= 0 else "#c62828"
+        self._card_tend_saldo._lbl.setText(f"{fmt_valor(media)} por período")
         self._card_tend_saldo.setStyleSheet(
             f"QFrame{{background:#f5f5f5;border:2px solid {cor};border-radius:8px;}}")
         self._card_tend_saldo._lbl.setStyleSheet(
@@ -3153,8 +3147,8 @@ class AbaTendencias(QWidget):
             df = df[(df["_DataDT"].dt.date >= de) & (df["_DataDT"].dt.date <= ate)]
 
         gran = self._cb_gran.currentText()
-        self._atualizar_card_destaque(df, gran)
         n_periodos = self._contar_periodos(df, gran)
+        self._atualizar_card_destaque(df, n_periodos)
         for painel in self._paineis:
             self._atualizar_card_painel(painel, df, n_periodos)
 
@@ -3329,7 +3323,7 @@ class MainWindow(QMainWindow):
         tabs.addTab(self._aba_categorias, "  Categorias  ")
         tabs.addTab(self._aba_pivot,      "  Tabela Dinâmica  ")
         tabs.addTab(self._aba_dash,       "  Dashboard  ")
-        tabs.addTab(self._aba_tendencias, "  Tendências  ")
+        tabs.addTab(self._aba_tendencias, "  Médias  ")
         tabs.addTab(self._aba_config,     "  Configurações  ")
         tabs.currentChanged.connect(self._on_tab)
 

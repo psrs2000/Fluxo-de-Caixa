@@ -16,7 +16,7 @@ Programa de controle financeiro pessoal (ou de pequenos negócios), em PyQt5, co
 5. [Aba "Categorias" — cadastrando Categoria, Sub-Categoria e Transação](#5-aba-categorias--cadastrando-categoria-sub-categoria-e-transação)
 6. [Aba "Tabela Dinâmica" — o coração do programa](#6-aba-tabela-dinâmica--o-coração-do-programa)
 7. [Aba "Dashboard" — o resumo visual das suas finanças](#7-aba-dashboard--o-resumo-visual-das-suas-finanças)
-8. [Aba "Tendências" — médias e tendência ao longo do tempo](#8-aba-tendências--médias-e-tendência-ao-longo-do-tempo)
+8. [Aba "Médias" — quanto por mês, em média](#8-aba-médias--quanto-por-mês-em-média)
 9. [Aba "Configurações" — senha, banco de dados e backup](#9-aba-configurações--senha-banco-de-dados-e-backup)
 10. [Exportando para Excel e CSV](#10-exportando-para-excel-e-csv)
 11. [Onde ficam seus dados e como fazer backup](#11-onde-ficam-seus-dados-e-como-fazer-backup)
@@ -69,7 +69,7 @@ O programa é organizado em **7 abas**, no topo da janela:
 | **Categorias** | Cadastrar as Categorias, Sub-Categorias e Transações que aparecem como sugestão na aba Dados |
 | **Tabela Dinâmica** | Cruzar e analisar os dados em qualquer combinação (a parte mais poderosa) |
 | **Dashboard** | Um painel visual de resumo, com cartões e mini-tabelas, para uma visão rápida |
-| **Tendências** | Médias e tendência (subindo/caindo) de Categoria, Sub-Categoria, Transação e do Saldo, ao longo do tempo |
+| **Médias** | Valor médio por mês (ou ano) de Categoria, Sub-Categoria, Transação e do Saldo |
 | **Configurações** | Senha de acesso ao programa, troca do banco de dados e backup |
 
 Você pode alternar entre elas a qualquer momento — os dados são os mesmos, vistos de formas diferentes.
@@ -216,7 +216,6 @@ Esse é exatamente o resultado mostrado na imagem acima.
 | **Excluir itens ▼** (ao lado da Linha 2) | O mesmo recurso de exclusão, mas para a dimensão da Linha 2 |
 | **Colunas** | A dimensão que vira colunas da tabela (ex: Mês). Escolha `(nenhuma)` para ter uma única coluna de valor |
 | **Agregar** | Como os valores são calculados dentro de cada célula: `sum` (soma), `count` (contagem de lançamentos), `mean` (média), `min` (mínimo) ou `max` (máximo) |
-| **Subtotais** | Mostra/esconde os totais de cada grupo (linha em destaque azul) |
 | **Total Geral** | Mostra/esconde a linha (e coluna) de Total Geral, em verde |
 | **Mostrar como %** | Em vez do valor em reais, mostra a porcentagem que aquela célula representa do Total Geral |
 
@@ -262,9 +261,11 @@ Quando você usa uma "Linha 2 (subgrupo)", cada grupo da Linha 1 fica expansíve
 
 ### 6.8 Ajustando a largura das colunas
 
-Quando os valores são grandes, uma coluna pode ficar estreita demais e o número aparecer cortado (ex.: `3.300…`), ou a tabela pode ficar mais larga que a tela. Para resolver, **arraste a borda entre os cabeçalhos das colunas**: aponte o mouse na linha que separa dois títulos de coluna e arraste para a esquerda (estreitar) ou para a direita (alargar). Assim você pode estreitar as colunas menos importantes e alargar as que precisa ver por inteiro, deixando tudo bem visível na tela.
+Quando os valores são grandes, uma coluna pode ficar estreita demais e o número aparecer cortado (ex.: `3.300…`). Para deixar tudo na largura ideal, clique no botão **"↔ Ajustar Colunas"** (ao lado de "Recolher Tudo", no topo da tabela): ele ajusta **todas as colunas de uma vez** ao tamanho do conteúdo, deixando os números por inteiro — como se você desse um duplo-clique na borda de cada coluna.
 
-A largura que você escolher é **salva automaticamente** e restaurada nas próximas vezes — inclusive depois de ordenar, mudar um filtro ou reabrir o programa.
+Você também pode ajustar **uma** coluna específica: aponte o mouse na linha que separa dois títulos de coluna e **dê um duplo-clique** (ajusta ao conteúdo) ou **arraste** para a largura que preferir.
+
+As larguras que você definir (pelo botão ou arrastando) ficam **salvas** e são **restauradas automaticamente** quando você muda um filtro, ordena, troca de dimensão ou reabre o programa — ou seja, você não precisa reajustar as colunas toda hora. Cada combinação de colunas guarda a sua própria configuração de larguras.
 
 ### 6.9 Tudo é salvo automaticamente
 
@@ -316,26 +317,28 @@ Assim como na Tabela Dinâmica, a configuração de cada tabela do Dashboard (qu
 
 ---
 
-## 8. Aba "Tendências" — médias e tendência ao longo do tempo
+## 8. Aba "Médias" — quanto por mês, em média
 
-Enquanto a Tabela Dinâmica mostra os números de forma analítica e o Dashboard dá um resumo rápido, a aba **Tendências** responde a uma pergunta diferente: **"em média, quanto eu gasto/recebo nisso, e isso está aumentando ou diminuindo com o tempo?"**
+Enquanto a Tabela Dinâmica mostra os números de forma analítica e o Dashboard dá um resumo rápido, a aba **Médias** responde a uma pergunta bem prática: **"em média, quanto eu gasto/recebo nisso por mês (ou por ano)?"** — por exemplo, *"quanto sobra por mês, em média?"* ou *"quanto gasto no açougue mensalmente?"*.
 
-![Aba Tendências](manual_assets/09_aba_tendencias.png)
+O cálculo é sempre o mesmo, simples: **soma tudo do período e divide pelo número de períodos** (meses ou anos) que têm lançamento.
+
+![Aba Médias](manual_assets/09_aba_tendencias.png)
 
 ### 8.1 Filtros e agrupamento (topo da aba)
 
-Assim como nas demais abas, você pode restringir a análise por **Ano**, **Mês** ou por um **período de datas** específico. O combo **"Agrupar por: Mês / Ano"** define se a tendência é calculada considerando cada mês ou cada ano como um "período" — isso afeta o cálculo da média e da tendência.
+Assim como nas demais abas, você pode restringir a análise por **Ano**, **Mês** ou por um **período de datas** específico. O combo **"Agrupar por: Mês / Ano"** define se a média é calculada por mês ou por ano (ou seja, qual é o "período" da divisão).
 
-### 8.2 "Tendência do Saldo" (cartão de destaque no topo)
+### 8.2 "Saldo Médio por Período" (cartão de destaque no topo)
 
-Este cartão, em azul e destacado, mostra se o seu **Saldo (Entradas − Saídas)** está, em média, **subindo, caindo ou estável** ao longo dos períodos analisados — calculado com uma linha de tendência sobre a série de saldos de cada mês/ano.
+Este cartão, em destaque, mostra o seu **saldo médio por período**: soma tudo (Entradas − Saídas) do intervalo filtrado e divide pelo número de meses (ou anos). Responde direto: *"em média, quanto sobra — ou falta — por mês?"* Fica **verde** quando é positivo (sobra) e **vermelho** quando é negativo (falta).
 
 ### 8.3 Os três painéis: Categoria, Sub-Categoria e Transação
 
-Iguais em formato aos painéis do Dashboard, mas com **checkboxes** ao lado de cada item:
+Iguais em formato aos painéis do Dashboard, mas com **checkboxes** ao lado de cada item. Os itens começam **todos desmarcados** — assim você marca apenas o que quer analisar:
 
-- Marque **um item** para ver a média/tendência só dele.
-- Marque **vários itens** para que o programa **some os valores de todos os marcados** e calcule a média/tendência do conjunto, como se fosse um único grupo (ex: somar "Supermercado" + "Restaurante" para ver a média combinada de alimentação).
+- Marque **um item** para ver a média só dele.
+- Marque **vários itens** para que o programa **some os valores de todos os marcados** e calcule a média do conjunto, como se fosse um único grupo (ex: somar "Supermercado" + "Restaurante" para ver a média combinada de alimentação).
 - Os botões **"Marcar todos"** e **"Nenhum"**, acima de cada lista, agilizam a seleção.
 
 ### 8.4 O cartão abaixo de cada painel
@@ -345,9 +348,11 @@ Mostra o **valor médio por período** (mês ou ano, conforme o agrupamento esco
 - 🔴 **Vermelho** — valor médio negativo (mais saída do que entrada)
 - 🟢 **Verde** — valor médio positivo (mais entrada do que saída)
 
-### 8.5 Tudo é salvo automaticamente
+Logo abaixo, em cinza, aparece também o **total acumulado** dos itens marcados no período (antes de dividir).
 
-A seleção de itens marcados em cada painel, o filtro de Ano/Mês e o agrupamento escolhido são lembrados entre sessões, do mesmo jeito que nas outras abas.
+### 8.5 O que é lembrado entre sessões
+
+O filtro de Ano/Mês e o agrupamento (Mês/Ano) escolhido são lembrados entre uma sessão e outra do programa, do mesmo jeito que nas outras abas. Já os **itens marcados** nos painéis **não** são guardados de propósito: cada vez que você abre o programa, os painéis começam **desmarcados**, para você marcar apenas o que quer analisar naquele momento.
 
 ---
 
@@ -453,7 +458,7 @@ Não existe recuperação automática de senha. É necessário abrir o arquivo `
 | **Dashboard** | Painel visual de resumo, com indicadores e tabelas resumidas, para uma visão rápida |
 | **Exportar** | Gerar um arquivo (Excel ou CSV) com os dados que estão sendo exibidos na tela |
 | **Importar** | Trazer dados de um arquivo externo (Excel ou CSV) para dentro do programa |
-| **Tendência** | A direção (alta, baixa ou estável) de uma série de valores ao longo do tempo, calculada a partir de uma linha de tendência |
+| **Média por período** | Soma de tudo no intervalo dividida pelo número de períodos (meses ou anos) com lançamento — o valor típico por mês/ano |
 | **Backup** | Uma cópia de segurança do banco de dados, guardada em outro local |
 
 ---
