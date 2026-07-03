@@ -213,7 +213,6 @@ Esse é exatamente o resultado mostrado na imagem acima.
 | **Excluir itens ▼** (ao lado da Linha 2) | O mesmo recurso de exclusão, mas para a dimensão da Linha 2 |
 | **Colunas** | A dimensão que vira colunas da tabela (ex: Mês). Escolha `(nenhuma)` para ter uma única coluna de valor |
 | **Agregar** | Como os valores são calculados dentro de cada célula: `sum` (soma), `count` (contagem de lançamentos), `mean` (média), `min` (mínimo) ou `max` (máximo) |
-| **Subtotais** | Mostra/esconde os totais de cada grupo (linha em destaque azul) |
 | **Total Geral** | Mostra/esconde a linha (e coluna) de Total Geral, em verde |
 | **Mostrar como %** | Em vez do valor em reais, mostra a porcentagem que aquela célula representa do Total Geral |
 

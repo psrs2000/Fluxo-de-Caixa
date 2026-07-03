@@ -1854,12 +1854,10 @@ class AbaPivot(QWidget):
         self._agg.setFixedWidth(90)
         lay_str.addWidget(self._agg, 1, 1)
 
-        self._chk_sub = QCheckBox("Subtotais"); self._chk_sub.setChecked(True)
-        lay_str.addWidget(self._chk_sub, 1, 3, 1, 2)
         self._chk_total = QCheckBox("Total Geral"); self._chk_total.setChecked(True)
-        lay_str.addWidget(self._chk_total, 1, 5, 1, 2)
+        lay_str.addWidget(self._chk_total, 1, 3, 1, 2)
         self._chk_pct = QCheckBox("Mostrar como %"); self._chk_pct.setChecked(False)
-        lay_str.addWidget(self._chk_pct, 1, 7)
+        lay_str.addWidget(self._chk_pct, 1, 5, 1, 2)
         root.addWidget(grp_str)
 
         # sets de exclusão e estado de expansão (populados dinamicamente)
@@ -1977,7 +1975,7 @@ class AbaPivot(QWidget):
         for cb in (self._row1, self._row2, self._cols, self._agg,
                    self._f_ano, self._f_mes, self._f_cat, self._f_tran, self._f_sub):
             cb.currentIndexChanged.connect(self._gerar)
-        for chk in (self._chk_sub, self._chk_total, self._chk_pct):
+        for chk in (self._chk_total, self._chk_pct):
             chk.stateChanged.connect(self._gerar)
         for rb in (self._rb_todos, self._rb_pos, self._rb_neg):
             rb.toggled.connect(self._gerar)
@@ -2050,7 +2048,7 @@ class AbaPivot(QWidget):
         # block signals during restore to avoid multiple _gerar calls
         widgets = [self._row1, self._row2, self._cols, self._agg,
                    self._f_ano, self._f_mes, self._f_cat, self._f_tran, self._f_sub,
-                   self._chk_sub, self._chk_total, self._chk_pct,
+                   self._chk_total, self._chk_pct,
                    self._rb_todos, self._rb_pos, self._rb_neg]
         for w in widgets:
             w.blockSignals(True)
@@ -2066,8 +2064,6 @@ class AbaPivot(QWidget):
                     idx = cb.findText(val)
                     if idx >= 0:
                         cb.setCurrentIndex(idx)
-            if "subtotais" in cfg:
-                self._chk_sub.setChecked(bool(cfg["subtotais"]))
             if "total_geral" in cfg:
                 self._chk_total.setChecked(bool(cfg["total_geral"]))
             if "mostrar_pct" in cfg:
@@ -2453,7 +2449,6 @@ class AbaPivot(QWidget):
             "row2":        self._row2.currentText(),
             "cols":        self._cols.currentText(),
             "agg":         self._agg.currentText(),
-            "subtotais":   self._chk_sub.isChecked(),
             "total_geral": self._chk_total.isChecked(),
             "mostrar_pct": self._chk_pct.isChecked(),
             "filtro_valor": "pos" if self._rb_pos.isChecked() else "neg" if self._rb_neg.isChecked() else "todos",
