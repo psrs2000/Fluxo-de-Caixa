@@ -2933,8 +2933,8 @@ class AbaTendencias(QWidget):
         flt.addStretch()
         root.addLayout(flt)
 
-        # ── card de destaque: tendência do saldo ──────────
-        self._card_tend_saldo = self._make_card_destaque("Tendência do Saldo")
+        # ── card de destaque: saldo médio por período ─────
+        self._card_tend_saldo = self._make_card_destaque("Saldo Médio por Período")
         root.addWidget(self._card_tend_saldo)
 
         # ── 3 painéis: Categoria / Sub-Categoria / Transação
@@ -3109,44 +3109,13 @@ class AbaTendencias(QWidget):
             return d[["Ano", "Mes"]].drop_duplicates().shape[0]
         return d["Ano"].drop_duplicates().shape[0]
 
-    def _serie_periodo(self, df, gran):
-        if df.empty:
-            return []
-        d = df.dropna(subset=["Ano", "Mes"]).copy()
-        if d.empty:
-            return []
-        if gran == "Mês":
-            d["_key"] = d["Ano"].astype(int) * 100 + d["Mes"].astype(int)
-        else:
-            d["_key"] = d["Ano"].astype(int)
-        return d.groupby("_key")["Valor"].sum().sort_index().tolist()
-
-    def _slope(self, valores):
-        n = len(valores)
-        if n < 2:
-            return None
-        xs = range(n)
-        mx = sum(xs) / n
-        my = sum(valores) / n
-        num = sum((x - mx) * (y - my) for x, y in zip(xs, valores))
-        den = sum((x - mx) ** 2 for x in xs)
-        return num / den if den else 0.0
-
-    def _atualizar_card_destaque(self, df, gran):
-        serie = self._serie_periodo(df, gran)
-        slope = self._slope(serie)
-        if slope is None:
-            self._card_tend_saldo._lbl.setText("Dados insuficientes para calcular a tendência")
-            cor = "#1565C0"
-        else:
-            if slope > 0.01:
-                sinal = "alta"
-            elif slope < -0.01:
-                sinal = "queda"
-            else:
-                sinal = "estável"
-            cor = "#1b5e20" if slope >= 0 else "#c62828"
-            self._card_tend_saldo._lbl.setText(f"{fmt_valor(slope)} por período  ({sinal})")
+    def _atualizar_card_destaque(self, df, n_periodos):
+        # saldo médio por período = saldo acumulado (soma de tudo) ÷ nº períodos
+        # — mesma lógica dos 3 painéis, aplicada a todos os lançamentos.
+        total = df["Valor"].sum()
+        media = total / n_periodos if n_periodos else 0.0
+        cor = "#1b5e20" if media >= 0 else "#c62828"
+        self._card_tend_saldo._lbl.setText(f"{fmt_valor(media)} por período")
         self._card_tend_saldo.setStyleSheet(
             f"QFrame{{background:#f5f5f5;border:2px solid {cor};border-radius:8px;}}")
         self._card_tend_saldo._lbl.setStyleSheet(
@@ -3181,8 +3150,8 @@ class AbaTendencias(QWidget):
             df = df[(df["_DataDT"].dt.date >= de) & (df["_DataDT"].dt.date <= ate)]
 
         gran = self._cb_gran.currentText()
-        self._atualizar_card_destaque(df, gran)
         n_periodos = self._contar_periodos(df, gran)
+        self._atualizar_card_destaque(df, n_periodos)
         for painel in self._paineis:
             self._atualizar_card_painel(painel, df, n_periodos)
 
@@ -3357,7 +3326,7 @@ class MainWindow(QMainWindow):
         tabs.addTab(self._aba_categorias, "  Categorias  ")
         tabs.addTab(self._aba_pivot,      "  Tabela Dinâmica  ")
         tabs.addTab(self._aba_dash,       "  Dashboard  ")
-        tabs.addTab(self._aba_tendencias, "  Tendências  ")
+        tabs.addTab(self._aba_tendencias, "  Médias  ")
         tabs.addTab(self._aba_config,     "  Configurações  ")
         tabs.currentChanged.connect(self._on_tab)
 
