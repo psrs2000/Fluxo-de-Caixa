@@ -351,9 +351,9 @@ Mostra o **valor médio por período** (mês ou ano, conforme o agrupamento esco
 
 Logo abaixo, em cinza, aparece também o **total acumulado** dos itens marcados no período (antes de dividir).
 
-### 8.5 Tudo é salvo automaticamente
+### 8.5 O que é lembrado entre sessões
 
-A seleção de itens marcados em cada painel, o filtro de Ano/Mês e o agrupamento escolhido são lembrados entre sessões, do mesmo jeito que nas outras abas.
+O filtro de Ano/Mês e o agrupamento (Mês/Ano) escolhido são lembrados entre uma sessão e outra do programa, do mesmo jeito que nas outras abas. Já os **itens marcados** nos painéis **não** são guardados de propósito: cada vez que você abre o programa, os painéis começam **desmarcados**, para você marcar apenas o que quer analisar naquele momento.
 
 ---
 
