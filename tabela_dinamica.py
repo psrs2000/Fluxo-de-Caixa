@@ -522,14 +522,17 @@ def fazer_backup_automatico():
             destino = os.path.join(pasta, f"{base}_{n}.db")
             n += 1
         shutil.copy2(DB_PATH, destino)
-        # rotação: mantém só os 10 mais recentes
+        # rotação: mantém só os 10 mais recentes. Ordena pelo NOME (que contém
+        # a data/hora), e não pela data de modificação do arquivo — copy2 copia
+        # a data do banco de origem, deixando os backups com datas iguais, o que
+        # tornaria a ordenação por data não-confiável.
         arquivos = sorted(
-            (os.path.join(pasta, f) for f in os.listdir(pasta)
+            (f for f in os.listdir(pasta)
              if f.startswith("backup_auto_") and f.endswith(".db")),
-            key=os.path.getmtime, reverse=True)
+            reverse=True)
         for antigo in arquivos[10:]:
             try:
-                os.remove(antigo)
+                os.remove(os.path.join(pasta, antigo))
             except OSError:
                 pass
     except Exception:
