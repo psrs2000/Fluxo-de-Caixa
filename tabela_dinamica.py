@@ -513,8 +513,14 @@ def fazer_backup_automatico():
         pasta = cfg.get("backup_auto_dir") or os.path.join(
             os.path.dirname(DB_PATH), "backups")
         os.makedirs(pasta, exist_ok=True)
-        destino = os.path.join(
-            pasta, f"backup_auto_{datetime.datetime.now():%Y%m%d_%H%M%S}.db")
+        base = f"backup_auto_{datetime.datetime.now():%Y%m%d_%H%M%S}"
+        destino = os.path.join(pasta, base + ".db")
+        # garante nome único: se já houver um backup no mesmo segundo, acrescenta
+        # um sufixo (_2, _3...) em vez de sobrescrever
+        n = 2
+        while os.path.exists(destino):
+            destino = os.path.join(pasta, f"{base}_{n}.db")
+            n += 1
         shutil.copy2(DB_PATH, destino)
         # rotação: mantém só os 10 mais recentes
         arquivos = sorted(
