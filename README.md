@@ -384,7 +384,11 @@ Para voltar a um acesso livre (sem senha), clique em **"Remover senha"**.
 
 ### 9.3 Backup
 
-Clique em **"Fazer backup..."** para salvar uma cópia completa do banco de dados atual no local que você escolher. O programa **lembra a última pasta usada** e já sugere o mesmo local da próxima vez, tornando o processo de backups regulares mais rápido.
+**Backup manual:** clique em **"Fazer backup..."** para salvar uma cópia completa do banco de dados atual no local que você escolher. O programa **lembra a última pasta usada** e já sugere o mesmo local da próxima vez, tornando o processo de backups regulares mais rápido.
+
+**Backup automático ao fechar:** marque a caixa **"Fazer backup automático ao fechar o programa"** para que, toda vez que você fechar o programa, uma cópia do banco seja salva **automaticamente** (sem abrir nenhuma janela). Use o botão **"Escolher pasta..."** para definir onde esses backups ficam — a pasta escolhida vira o padrão e é lembrada nas próximas vezes. Se você não escolher nenhuma, o programa cria uma subpasta **`backups`** ao lado do banco de dados.
+
+Para não lotar o disco, o programa mantém apenas os **10 backups automáticos mais recentes**, apagando os mais antigos. Cada arquivo tem a data e a hora no nome (ex.: `backup_auto_20260709_2158.db`), então você consegue voltar a uma versão de um dia específico se precisar.
 
 ---
 
