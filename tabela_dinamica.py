@@ -500,6 +500,45 @@ def apagar_banco():
     con.close()
 
 
+def fazer_backup_automatico():
+    """Copia o banco para a pasta de backups automáticos (se ligado nas
+    Configurações), mantendo apenas os 10 arquivos mais recentes. É silencioso
+    e nunca lança exceção — não pode impedir o fechamento do programa."""
+    try:
+        cfg = cfg_load()
+        if not cfg.get("backup_auto"):
+            return
+        if not os.path.isfile(DB_PATH):
+            return
+        pasta = cfg.get("backup_auto_dir") or os.path.join(
+            os.path.dirname(DB_PATH), "backups")
+        os.makedirs(pasta, exist_ok=True)
+        base = f"backup_auto_{datetime.datetime.now():%Y%m%d_%H%M%S}"
+        destino = os.path.join(pasta, base + ".db")
+        # garante nome único: se já houver um backup no mesmo segundo, acrescenta
+        # um sufixo (_2, _3...) em vez de sobrescrever
+        n = 2
+        while os.path.exists(destino):
+            destino = os.path.join(pasta, f"{base}_{n}.db")
+            n += 1
+        shutil.copy2(DB_PATH, destino)
+        # rotação: mantém só os 10 mais recentes. Ordena pelo NOME (que contém
+        # a data/hora), e não pela data de modificação do arquivo — copy2 copia
+        # a data do banco de origem, deixando os backups com datas iguais, o que
+        # tornaria a ordenação por data não-confiável.
+        arquivos = sorted(
+            (f for f in os.listdir(pasta)
+             if f.startswith("backup_auto_") and f.endswith(".db")),
+            reverse=True)
+        for antigo in arquivos[10:]:
+            try:
+                os.remove(os.path.join(pasta, antigo))
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+
 class _ResolvedorCadastros:
     """Resolve Categoria/Sub-Categoria/Transação durante a importação:
     se já existir um cadastro com a mesma grafia (ignorando maiúsculas/minúsculas
@@ -3197,10 +3236,32 @@ class AbaConfiguracoes(QWidget):
 
         # ── Backup ───────────────────────────────────────────
         grp_backup = QGroupBox("Backup")
-        lay_backup = QHBoxLayout(grp_backup)
-        lay_backup.addWidget(QLabel("Salva uma cópia completa do banco de dados atual."))
-        lay_backup.addStretch()
-        lay_backup.addWidget(_btn("Fazer backup...", "#6A1B9A", self._fazer_backup, 140))
+        lay_backup = QVBoxLayout(grp_backup)
+
+        # backup manual (já existente)
+        row_man = QHBoxLayout()
+        row_man.addWidget(QLabel("Salva uma cópia completa do banco de dados atual."))
+        row_man.addStretch()
+        row_man.addWidget(_btn("Fazer backup...", "#6A1B9A", self._fazer_backup, 140))
+        lay_backup.addLayout(row_man)
+
+        # backup automático ao fechar
+        self._chk_backup_auto = QCheckBox("Fazer backup automático ao fechar o programa")
+        self._chk_backup_auto.setChecked(bool(cfg_load().get("backup_auto")))
+        self._chk_backup_auto.toggled.connect(self._toggle_backup_auto)
+        lay_backup.addWidget(self._chk_backup_auto)
+
+        row_pasta = QHBoxLayout()
+        row_pasta.addWidget(QLabel("Pasta dos backups automáticos:"))
+        self._ed_backup_dir = QLineEdit(self._pasta_backup_auto())
+        self._ed_backup_dir.setReadOnly(True)
+        row_pasta.addWidget(self._ed_backup_dir, 1)
+        row_pasta.addWidget(_btn("Escolher pasta...", "#1565C0", self._escolher_pasta_backup, 140))
+        lay_backup.addLayout(row_pasta)
+
+        lay_backup.addWidget(QLabel(
+            "Mantém automaticamente os 10 backups mais recentes (os mais antigos "
+            "são apagados)."))
         root.addWidget(grp_backup)
 
         root.addStretch()
@@ -3289,6 +3350,22 @@ class AbaConfiguracoes(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Backup", f"Erro ao salvar backup:\n{e}")
 
+    # ── backup automático ao fechar ────────────────────────
+    def _pasta_backup_auto(self):
+        return cfg_load().get("backup_auto_dir") or os.path.join(
+            os.path.dirname(DB_PATH), "backups")
+
+    def _toggle_backup_auto(self, ligado):
+        cfg_save({"backup_auto": bool(ligado)})
+
+    def _escolher_pasta_backup(self):
+        pasta = QFileDialog.getExistingDirectory(
+            self, "Escolher pasta dos backups automáticos", self._pasta_backup_auto())
+        if not pasta:
+            return
+        cfg_save({"backup_auto_dir": pasta})
+        self._ed_backup_dir.setText(pasta)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -3341,6 +3418,7 @@ class MainWindow(QMainWindow):
             "x":          self.x(),
             "y":          self.y(),
         }})
+        fazer_backup_automatico()
         event.accept()
 
     def _on_tab(self, idx):
