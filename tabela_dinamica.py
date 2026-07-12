@@ -2971,6 +2971,14 @@ class AbaTendencias(QWidget):
         self._card_tend_saldo = self._make_card_destaque("Saldo Médio por Período")
         root.addWidget(self._card_tend_saldo)
 
+        # aviso de projeção (aparece só quando o período é menor que 1 mês/ano)
+        self._lbl_previsao = QLabel("")
+        self._lbl_previsao.setStyleSheet(
+            "color:#c62828;font-size:11px;font-weight:bold;border:none;")
+        self._lbl_previsao.setWordWrap(True)
+        self._lbl_previsao.setVisible(False)
+        root.addWidget(self._lbl_previsao)
+
         # ── 3 painéis: Categoria / Sub-Categoria / Transação
         paineis_row = QHBoxLayout()
         paineis_row.setSpacing(14)
@@ -3137,13 +3145,20 @@ class AbaTendencias(QWidget):
         self._popular_listas()
         self._preencher()
 
-    def _contar_periodos(self, df, gran):
-        d = df.dropna(subset=["Ano", "Mes"])
+    def _qte_periodos(self, df, gran):
+        """Número de períodos com base nos DIAS CORRIDOS entre o primeiro e o
+        último lançamento: dias/30,417 (meses) ou dias/365,25 (anos). Assim um
+        intervalo que cruza a virada do mês (ex.: 16/jun a 15/jul) conta como
+        ~1 mês, e não como 2. Para períodos menores que 1, o valor vira uma
+        projeção (ex.: 15 dias ≈ 0,49 mês)."""
+        d = df.dropna(subset=["_DataDT"])
         if d.empty:
-            return 0
-        if gran == "Mês":
-            return d[["Ano", "Mes"]].drop_duplicates().shape[0]
-        return d["Ano"].drop_duplicates().shape[0]
+            return 0.0
+        dias = (d["_DataDT"].max() - d["_DataDT"].min()).days + 1
+        if dias < 1:
+            dias = 1
+        divisor = 365.25 if gran == "Ano" else 30.417
+        return dias / divisor
 
     def _atualizar_card_destaque(self, df, n_periodos):
         # saldo médio por período = saldo acumulado (soma de tudo) ÷ nº períodos
@@ -3186,10 +3201,20 @@ class AbaTendencias(QWidget):
             df = df[(df["_DataDT"].dt.date >= de) & (df["_DataDT"].dt.date <= ate)]
 
         gran = self._cb_gran.currentText()
-        n_periodos = self._contar_periodos(df, gran)
+        n_periodos = self._qte_periodos(df, gran)
         self._atualizar_card_destaque(df, n_periodos)
         for painel in self._paineis:
             self._atualizar_card_painel(painel, df, n_periodos)
+
+        # aviso de projeção quando há menos de 1 período completo de dados
+        if 0 < n_periodos < 1:
+            unidade = "um ano" if gran == "Ano" else "um mês"
+            self._lbl_previsao.setText(
+                f"⚠ Há menos de {unidade} de dados: os valores acima são uma "
+                f"projeção (estimativa para {unidade} inteiro, mantido o ritmo atual).")
+            self._lbl_previsao.setVisible(True)
+        else:
+            self._lbl_previsao.setVisible(False)
 
 
 # ═══════════════════════════════════════════════════════════

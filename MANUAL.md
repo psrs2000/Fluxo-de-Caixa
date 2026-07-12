@@ -318,7 +318,9 @@ Assim como na Tabela Dinâmica, a configuração de cada tabela do Dashboard (qu
 
 Enquanto a Tabela Dinâmica mostra os números de forma analítica e o Dashboard dá um resumo rápido, a aba **Médias** responde a uma pergunta bem prática: **"em média, quanto eu gasto/recebo nisso por mês (ou por ano)?"** — por exemplo, *"quanto sobra por mês, em média?"* ou *"quanto gasto no açougue mensalmente?"*.
 
-O cálculo é sempre o mesmo, simples: **soma tudo do período e divide pelo número de períodos** (meses ou anos) que têm lançamento.
+O cálculo é sempre o mesmo: **soma tudo do período e divide pela quantidade de meses (ou anos)** desse período. Essa quantidade é medida pelos **dias corridos** entre o primeiro e o último lançamento — dividindo por ~30,4 dias (para meses) ou ~365,25 dias (para anos). Assim, um intervalo que atravessa a virada do mês (por exemplo, **16/junho a 15/julho**) conta como **~1 mês** — e não como 2 —, dando uma média fiel.
+
+> **Projeção para períodos curtos:** se você tiver **menos de um mês** de dados (no agrupamento por Mês) ou **menos de um ano** (por Ano), os valores mostrados passam a ser uma **projeção** — a estimativa para um mês/ano inteiro, mantido o ritmo atual. Nesse caso o programa exibe um **aviso em vermelho** logo abaixo do cartão do saldo, para você saber que aquele número é uma previsão, não um valor já realizado.
 
 ![Aba Médias](manual_assets/09_aba_tendencias.png)
 
@@ -459,7 +461,7 @@ Não existe recuperação automática de senha. É necessário abrir o arquivo `
 | **Dashboard** | Painel visual de resumo, com indicadores e tabelas resumidas, para uma visão rápida |
 | **Exportar** | Gerar um arquivo (Excel ou CSV) com os dados que estão sendo exibidos na tela |
 | **Importar** | Trazer dados de um arquivo externo (Excel ou CSV) para dentro do programa |
-| **Média por período** | Soma de tudo no intervalo dividida pelo número de períodos (meses ou anos) com lançamento — o valor típico por mês/ano |
+| **Média por período** | Soma de tudo no intervalo dividida pela quantidade de meses (ou anos) do intervalo, medida pelos dias corridos — o valor típico por mês/ano |
 | **Backup** | Uma cópia de segurança do banco de dados, guardada em outro local |
 
 ---
