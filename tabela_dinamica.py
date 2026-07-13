@@ -2042,7 +2042,8 @@ class AbaPivot(QWidget):
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
         df["Mes"]   = pd.to_numeric(df["Mes"],   errors="coerce")
         df["Ano"]   = pd.to_numeric(df["Ano"],   errors="coerce")
-        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
+        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True,
+                                        errors="coerce", format="mixed")
         return df
 
     def _on_toggle_periodo(self, ligado):
@@ -2766,7 +2767,8 @@ class AbaDashboard(QWidget):
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
         df["Mes"]   = pd.to_numeric(df["Mes"],   errors="coerce")
         df["Ano"]   = pd.to_numeric(df["Ano"],   errors="coerce")
-        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
+        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True,
+                                        errors="coerce", format="mixed")
         df = df[df["Ano"] != 1900]
         self._df_full = df
 
@@ -3127,7 +3129,8 @@ class AbaTendencias(QWidget):
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
         df["Mes"]   = pd.to_numeric(df["Mes"],   errors="coerce")
         df["Ano"]   = pd.to_numeric(df["Ano"],   errors="coerce")
-        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
+        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True,
+                                        errors="coerce", format="mixed")
         df = df[df["Ano"] != 1900]
         self._df_full = df
 
@@ -3150,22 +3153,11 @@ class AbaTendencias(QWidget):
         último lançamento: dias/30,417 (meses) ou dias/365,25 (anos). Assim um
         intervalo que cruza a virada do mês (ex.: 16/jun a 15/jul) conta como
         ~1 mês, e não como 2. Para períodos menores que 1, o valor vira uma
-        projeção (ex.: 15 dias ≈ 0,49 mês).
-
-        Se o filtro "Filtrar por período" estiver ligado, o intervalo usado é a
-        própria janela De→Até escolhida pelo usuário (assim o divisor não
-        depende de haver ou não um lançamento exatamente nas datas das bordas).
-        Caso contrário, usa o intervalo real entre o primeiro e o último
-        lançamento."""
-        if self._chk_periodo.isChecked():
-            de  = self._dt_de.date().toPyDate()
-            ate = self._dt_ate.date().toPyDate()
-            dias = (ate - de).days + 1
-        else:
-            d = df.dropna(subset=["_DataDT"])
-            if d.empty:
-                return 0.0
-            dias = (d["_DataDT"].max() - d["_DataDT"].min()).days + 1
+        projeção (ex.: 15 dias ≈ 0,49 mês)."""
+        d = df.dropna(subset=["_DataDT"])
+        if d.empty:
+            return 0.0
+        dias = (d["_DataDT"].max() - d["_DataDT"].min()).days + 1
         if dias < 1:
             dias = 1
         divisor = 365.25 if gran == "Ano" else 30.417

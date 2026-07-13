@@ -328,8 +328,6 @@ O cálculo é sempre o mesmo: **soma tudo do período e divide pela quantidade d
 
 Assim como nas demais abas, você pode restringir a análise por **Ano**, **Mês** ou por um **período de datas** específico. O combo **"Agrupar por: Mês / Ano"** define se a média é calculada por mês ou por ano (ou seja, qual é o "período" da divisão).
 
-Quando você liga o **"Filtrar por período"** e escolhe as datas **De/Até**, é essa janela que serve de base para contar os dias (e, portanto, os meses/anos) da divisão — assim o resultado não depende de haver ou não um lançamento exatamente nas datas das pontas. Sem o filtro de período ligado, a contagem usa o intervalo entre o primeiro e o último lançamento.
-
 ### 8.2 "Saldo Médio por Período" (cartão de destaque no topo)
 
 Este cartão, em destaque, mostra o seu **saldo médio por período**: soma tudo (Entradas − Saídas) do intervalo filtrado e divide pelo número de meses (ou anos). Responde direto: *"em média, quanto sobra — ou falta — por mês?"* Fica **verde** quando é positivo (sobra) e **vermelho** quando é negativo (falta).
