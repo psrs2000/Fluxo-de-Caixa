@@ -92,7 +92,7 @@ A aba é dividida em três partes, de cima para baixo:
 
 **Campos do formulário:**
 
-- **Data** — digite no formato `dd/mm/aaaa` (ex: `15/06/2026`) ou, se quiser registrar também o horário, `dd/mm/aaaa hh:mm:ss` (ex: `15/06/2026 10:30:00`). É o único campo obrigatório.
+- **Data** — digite no formato `dd/mm/aaaa` (ex: `15/06/2026`) ou, se quiser registrar também o horário, `dd/mm/aaaa hh:mm:ss` (ex: `15/06/2026 10:30:00`). É o único campo obrigatório. Ao lado do campo há a caixa **"Hoje"**: quando marcada (padrão), o programa **preenche a data de hoje automaticamente e trava o campo**, evitando erros de digitação — ideal para lançar o dia a dia. Para registrar algo de **outra data**, basta **desmarcar** a caixa e digitar a data desejada. Se você digitar uma data muito distante de hoje (por exemplo, com o ano trocado), o programa avisa e pede confirmação antes de salvar (veja a seção 9.4).
 - **Categoria / Sub-Categoria / Transação** — são campos com sugestão automática (autocompletar): ao digitar, o programa mostra os valores que você já usou antes, para você manter um padrão (evitando, por exemplo, cadastrar "Alimentacao" numa linha e "Alimentação" em outra).
 - **Descrição** — texto livre, opcional, para você lembrar do que se tratou aquele lançamento.
 - **Valor** — o valor em reais. Lembre-se: **negativo para saídas, positivo para entradas**. Aceita tanto `350,90` quanto `350.90`.
@@ -391,6 +391,17 @@ Para voltar a um acesso livre (sem senha), clique em **"Remover senha"**.
 **Backup automático ao fechar:** marque a caixa **"Fazer backup automático ao fechar o programa"** para que, toda vez que você fechar o programa, uma cópia do banco seja salva **automaticamente** (sem abrir nenhuma janela). Use o botão **"Escolher pasta..."** para definir onde esses backups ficam — a pasta escolhida vira o padrão e é lembrada nas próximas vezes. Se você não escolher nenhuma, o programa cria uma subpasta **`backups`** ao lado do banco de dados.
 
 Para não lotar o disco, o programa mantém apenas os **10 backups automáticos mais recentes**, apagando os mais antigos. Cada arquivo tem a data e a hora no nome (ex.: `backup_auto_20260709_2158.db`), então você consegue voltar a uma versão de um dia específico se precisar.
+
+### 9.4 Validação de datas (aba Dados)
+
+Data errada é um dos erros mais chatos: um ano ou mês trocado passa despercebido e bagunça as Médias, o Dashboard e os filtros. Para ajudar a evitar isso, ao **salvar** um lançamento o programa confere se a data está muito longe de hoje e, se estiver, mostra um aviso pedindo confirmação (ex.: *"A data 14/07/2016 está a 3652 dias no passado. Tem certeza que está correta?"*).
+
+Aqui você define o que é "muito longe":
+
+- **Avisar se a data estiver mais de [N] dias no passado** — padrão **400 dias** (cerca de 13 meses, o que permite lançar coisas do ano passado sem incomodar).
+- **Avisar se a data estiver mais de [N] dias no futuro** — padrão **0 dias**, ou seja, **qualquer data futura** dispara o aviso. Aumente esse número se você costuma lançar datas futuras (ex.: contas a vencer).
+
+Esse aviso funciona em conjunto com a caixa **"Hoje"** da aba Dados: com ela marcada, a data já entra correta (hoje) e o aviso nem precisa aparecer; ao desmarcá-la para digitar datas antigas, o aviso é a sua rede de proteção.
 
 ---
 

@@ -21,7 +21,7 @@ except ImportError:
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QTabWidget,
     QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
-    QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox,
+    QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox,
     QRadioButton, QButtonGroup, QGroupBox, QFileDialog,
     QMessageBox, QTableWidget, QTableWidgetItem,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QSplitter,
@@ -757,7 +757,25 @@ class AbaForm(QWidget):
                 w = QLineEdit()
                 if key == "Descricao":
                     w.setMinimumWidth(450)
-            form.addWidget(w, row_idx, 1, Qt.AlignLeft)
+            if key == "Data":
+                # caixa "Hoje": quando marcada, preenche a data de hoje e
+                # bloqueia o campo, evitando erros de digitação de data
+                w.setMinimumWidth(180)
+                self._chk_hoje = QCheckBox("Hoje")
+                self._chk_hoje.setToolTip(
+                    "Marcada: preenche a data de hoje automaticamente.\n"
+                    "Desmarque para lançar registros de outras datas.")
+                self._chk_hoje.setChecked(bool(cfg_load().get("data_hoje_auto", True)))
+                self._chk_hoje.toggled.connect(self._on_toggle_hoje)
+                cont = QHBoxLayout()
+                cont.setContentsMargins(0, 0, 0, 0)
+                cont.setSpacing(8)
+                cont.addWidget(w)
+                cont.addWidget(self._chk_hoje)
+                cont.addStretch()
+                form.addLayout(cont, row_idx, 1, Qt.AlignLeft)
+            else:
+                form.addWidget(w, row_idx, 1, Qt.AlignLeft)
             self._campos[key] = w
         # ao trocar a Categoria, a lista de Sub-Categoria deve refletir só
         # as sub-categorias cadastradas para aquela categoria
@@ -866,6 +884,8 @@ class AbaForm(QWidget):
         root.addLayout(exp_row)
 
         self._carregar()
+        # aplica o estado inicial da caixa "Hoje" (preenche/trava a data)
+        self._on_toggle_hoje(self._chk_hoje.isChecked())
 
     # ── campos helpers ────────────────────────────────────
     def _get_text(self, key) -> str:
@@ -892,6 +912,17 @@ class AbaForm(QWidget):
             w.clearEditText()
         else:
             w.clear()
+
+    def _on_toggle_hoje(self, marcada):
+        cfg_save({"data_hoje_auto": bool(marcada)})
+        campo = self._campos["Data"]
+        if marcada:
+            # só força "hoje" quando não se está editando um registro existente
+            if not self._edit_id:
+                campo.setText(datetime.date.today().strftime("%d/%m/%Y"))
+            campo.setReadOnly(True)
+        else:
+            campo.setReadOnly(False)
 
     def _atualizar_combos(self):
         """Recarrega Categoria/Sub-Categoria/Transação a partir dos cadastros
@@ -955,6 +986,28 @@ class AbaForm(QWidget):
             cb.blockSignals(False)
 
     # ── ações formulário ──────────────────────────────────
+    def _data_confirmada(self, data_str) -> bool:
+        """Alerta se a data estiver fora da janela configurada (dias no passado /
+        no futuro). Retorna False se o usuário optar por corrigir."""
+        dt = _parse_data(data_str)
+        if dt is None:
+            return True
+        cfg = cfg_load()
+        dias_pas = int(cfg.get("data_aviso_passado", 400))
+        dias_fut = int(cfg.get("data_aviso_futuro", 0))
+        delta = (dt.date() - datetime.date.today()).days
+        if delta > dias_fut:
+            aviso = f"{delta} dia(s) no futuro"
+        elif -delta > dias_pas:
+            aviso = f"{-delta} dia(s) no passado"
+        else:
+            return True
+        resp = QMessageBox.question(
+            self, "Confirmar data",
+            f"A data {data_str} está a {aviso} de hoje.\n\nTem certeza que está correta?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        return resp == QMessageBox.Yes
+
     def _salvar(self):
         row = {k: self._get_text(k) for k in self._campos}
         if not row["Data"]:
@@ -964,6 +1017,8 @@ class AbaForm(QWidget):
         if mes is None:
             QMessageBox.warning(self, "Atenção",
                 "Formato de data inválido.\nUse dd/mm/aaaa ou dd/mm/aaaa hh:mm:ss")
+            return
+        if not self._data_confirmada(row["Data"]):
             return
         try:
             valor = _parse_valor(row["Valor"]) if row["Valor"] else 0.0
@@ -1045,6 +1100,12 @@ class AbaForm(QWidget):
             self._atualizar_subcats_form(preservar=False)
             self._set_text("Sub_Categoria", ultimo["Sub_Categoria"] or "")
             self._set_text("Transacao", ultimo["Transacao"] or "")
+        # caixa "Hoje": em um lançamento novo, força a data de hoje e trava o campo
+        if getattr(self, "_chk_hoje", None) and self._chk_hoje.isChecked():
+            self._set_text("Data", datetime.date.today().strftime("%d/%m/%Y"))
+            self._campos["Data"].setReadOnly(True)
+        else:
+            self._campos["Data"].setReadOnly(False)
         self._carregando_selecao = False
         self._edit_id = None
         self._dirty.clear()
@@ -1106,6 +1167,7 @@ class AbaForm(QWidget):
         self._dirty.clear()
         r = sel[0].row()
         self._edit_id = int(self._table.item(r, 0).text())
+        self._campos["Data"].setReadOnly(False)  # editar registro: data liberada
         self._set_text("Data",          self._table.item(r, 1).text())
         self._set_text("Categoria",     self._table.item(r, 4).text())
         self._atualizar_subcats_form(preservar=False)
@@ -1123,6 +1185,7 @@ class AbaForm(QWidget):
             return
         r = sel[0].row()
         self._carregando_selecao = True
+        self._campos["Data"].setReadOnly(False)  # duplicar: data liberada p/ ajuste
         self._set_text("Data",          self._table.item(r, 1).text())
         self._set_text("Categoria",     self._table.item(r, 4).text())
         self._atualizar_subcats_form(preservar=False)
@@ -3291,6 +3354,35 @@ class AbaConfiguracoes(QWidget):
             "Mantém automaticamente os 10 backups mais recentes (os mais antigos "
             "são apagados)."))
         root.addWidget(grp_backup)
+
+        # ── Validação de datas (aba Dados) ────────────────────
+        grp_dt = QGroupBox("Validação de datas (aba Dados)")
+        lay_dt = QVBoxLayout(grp_dt)
+        lay_dt.addWidget(QLabel(
+            "Ao salvar um lançamento, o programa avisa se a data digitada estiver "
+            "muito longe de hoje (ajuda a pegar erros como o ano trocado)."))
+        cfg = cfg_load()
+        r1 = QHBoxLayout()
+        r1.addWidget(QLabel("Avisar se a data estiver mais de"))
+        self._sp_pas = QSpinBox(); self._sp_pas.setRange(0, 100000)
+        self._sp_pas.setValue(int(cfg.get("data_aviso_passado", 400)))
+        self._sp_pas.setSuffix(" dias")
+        self._sp_pas.valueChanged.connect(
+            lambda v: cfg_save({"data_aviso_passado": int(v)}))
+        r1.addWidget(self._sp_pas)
+        r1.addWidget(QLabel("no passado")); r1.addStretch()
+        lay_dt.addLayout(r1)
+        r2 = QHBoxLayout()
+        r2.addWidget(QLabel("Avisar se a data estiver mais de"))
+        self._sp_fut = QSpinBox(); self._sp_fut.setRange(0, 100000)
+        self._sp_fut.setValue(int(cfg.get("data_aviso_futuro", 0)))
+        self._sp_fut.setSuffix(" dias")
+        self._sp_fut.valueChanged.connect(
+            lambda v: cfg_save({"data_aviso_futuro": int(v)}))
+        r2.addWidget(self._sp_fut)
+        r2.addWidget(QLabel("no futuro  (0 = qualquer data futura avisa)")); r2.addStretch()
+        lay_dt.addLayout(r2)
+        root.addWidget(grp_dt)
 
         root.addStretch()
 
