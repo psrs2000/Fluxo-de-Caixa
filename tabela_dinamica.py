@@ -759,8 +759,9 @@ class AbaForm(QWidget):
                     w.setMinimumWidth(450)
             if key == "Data":
                 # caixa "Hoje": quando marcada, preenche a data de hoje e
-                # bloqueia o campo, evitando erros de digitação de data
-                w.setMinimumWidth(180)
+                # bloqueia o campo, evitando erros de digitação de data.
+                # largura FIXA para não "esticar" ao lado da caixa Hoje
+                w.setFixedWidth(170)
                 self._chk_hoje = QCheckBox("Hoje")
                 self._chk_hoje.setToolTip(
                     "Marcada: preenche a data de hoje automaticamente.\n"
