@@ -914,15 +914,21 @@ class AbaForm(QWidget):
             w.clear()
 
     def _on_toggle_hoje(self, marcada):
+        # toggle feito pelo usuário: guarda a preferência e aplica na hora
         cfg_save({"data_hoje_auto": bool(marcada)})
         campo = self._campos["Data"]
         if marcada:
-            # só força "hoje" quando não se está editando um registro existente
-            if not self._edit_id:
-                campo.setText(datetime.date.today().strftime("%d/%m/%Y"))
+            campo.setText(datetime.date.today().strftime("%d/%m/%Y"))
             campo.setReadOnly(True)
         else:
             campo.setReadOnly(False)
+
+    def _set_hoje_silencioso(self, marcada):
+        """Muda o estado da caixa 'Hoje' sem disparar o handler nem alterar a
+        preferência salva (usado ao selecionar/duplicar/limpar registros)."""
+        self._chk_hoje.blockSignals(True)
+        self._chk_hoje.setChecked(bool(marcada))
+        self._chk_hoje.blockSignals(False)
 
     def _atualizar_combos(self):
         """Recarrega Categoria/Sub-Categoria/Transação a partir dos cadastros
@@ -1100,12 +1106,15 @@ class AbaForm(QWidget):
             self._atualizar_subcats_form(preservar=False)
             self._set_text("Sub_Categoria", ultimo["Sub_Categoria"] or "")
             self._set_text("Transacao", ultimo["Transacao"] or "")
-        # caixa "Hoje": em um lançamento novo, força a data de hoje e trava o campo
-        if getattr(self, "_chk_hoje", None) and self._chk_hoje.isChecked():
-            self._set_text("Data", datetime.date.today().strftime("%d/%m/%Y"))
-            self._campos["Data"].setReadOnly(True)
-        else:
-            self._campos["Data"].setReadOnly(False)
+        # caixa "Hoje": num lançamento novo, volta à preferência salva do usuário
+        if getattr(self, "_chk_hoje", None) is not None:
+            prefere_hoje = bool(cfg_load().get("data_hoje_auto", True))
+            self._set_hoje_silencioso(prefere_hoje)
+            if prefere_hoje:
+                self._set_text("Data", datetime.date.today().strftime("%d/%m/%Y"))
+                self._campos["Data"].setReadOnly(True)
+            else:
+                self._campos["Data"].setReadOnly(False)
         self._carregando_selecao = False
         self._edit_id = None
         self._dirty.clear()
@@ -1167,7 +1176,9 @@ class AbaForm(QWidget):
         self._dirty.clear()
         r = sel[0].row()
         self._edit_id = int(self._table.item(r, 0).text())
-        self._campos["Data"].setReadOnly(False)  # editar registro: data liberada
+        # editando um registro existente: data livre e caixa "Hoje" desmarcada
+        self._set_hoje_silencioso(False)
+        self._campos["Data"].setReadOnly(False)
         self._set_text("Data",          self._table.item(r, 1).text())
         self._set_text("Categoria",     self._table.item(r, 4).text())
         self._atualizar_subcats_form(preservar=False)
@@ -1185,7 +1196,9 @@ class AbaForm(QWidget):
             return
         r = sel[0].row()
         self._carregando_selecao = True
-        self._campos["Data"].setReadOnly(False)  # duplicar: data liberada p/ ajuste
+        # duplicar: data livre e caixa "Hoje" desmarcada (data vem do registro)
+        self._set_hoje_silencioso(False)
+        self._campos["Data"].setReadOnly(False)
         self._set_text("Data",          self._table.item(r, 1).text())
         self._set_text("Categoria",     self._table.item(r, 4).text())
         self._atualizar_subcats_form(preservar=False)
