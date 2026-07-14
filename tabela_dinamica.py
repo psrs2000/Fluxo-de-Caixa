@@ -744,8 +744,13 @@ class AbaForm(QWidget):
             ("Descricao",     "Descrição",                   False),
             ("Valor",         "Valor",                       False),
         ]
+        # colunas 0 e 3 são espaçadores elásticos: centralizam o bloco
+        # rótulo(1) + campo(2) horizontalmente, deixando o formulário mais
+        # próximo do centro da tela
+        form.setColumnStretch(0, 1)
+        form.setColumnStretch(3, 1)
         for row_idx, (key, lbl_txt, is_combo) in enumerate(specs):
-            form.addWidget(QLabel(lbl_txt + ":"), row_idx, 0, Qt.AlignRight)
+            form.addWidget(QLabel(lbl_txt + ":"), row_idx, 1, Qt.AlignRight)
             if is_combo:
                 # combos de Categoria/Sub-Categoria/Transação só permitem
                 # escolher valores já cadastrados (aba "Categorias") —
@@ -774,9 +779,9 @@ class AbaForm(QWidget):
                 cont.addWidget(w)
                 cont.addWidget(self._chk_hoje)
                 cont.addStretch()
-                form.addLayout(cont, row_idx, 1, Qt.AlignLeft)
+                form.addLayout(cont, row_idx, 2, Qt.AlignLeft)
             else:
-                form.addWidget(w, row_idx, 1, Qt.AlignLeft)
+                form.addWidget(w, row_idx, 2, Qt.AlignLeft)
             self._campos[key] = w
         # ao trocar a Categoria, a lista de Sub-Categoria deve refletir só
         # as sub-categorias cadastradas para aquela categoria
@@ -797,7 +802,7 @@ class AbaForm(QWidget):
         btn_row.addWidget(self._btn_dup)
         btn_row.addWidget(self._btn_lote)
         btn_row.addStretch()
-        form.addLayout(btn_row, len(specs), 0, 1, 2)
+        form.addLayout(btn_row, len(specs), 1, 1, 2)
         root.addWidget(grp)
 
         # conectar dirty tracking em todos os campos
