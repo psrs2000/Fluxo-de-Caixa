@@ -349,9 +349,20 @@ Mostra o **valor médio por período** (mês ou ano, conforme o agrupamento esco
 
 Logo abaixo, em cinza, aparece também o **total acumulado** dos itens marcados no período (antes de dividir).
 
-### 8.5 O que é lembrado entre sessões
+### 8.5 Simulador de meta (faturamento × despesas)
 
-O filtro de Ano/Mês e o agrupamento (Mês/Ano) escolhido são lembrados entre uma sessão e outra do programa, do mesmo jeito que nas outras abas. Já os **itens marcados** nos painéis **não** são guardados de propósito: cada vez que você abre o programa, os painéis começam **desmarcados**, para você marcar apenas o que quer analisar naquele momento.
+Logo abaixo dos filtros há a linha **"Simular meta ►"**, com dois campos de percentual: **Faturamento** e **Despesas**. Eles permitem responder à pergunta *"e se…?"* sem alterar nenhum lançamento:
+
+- Com os dois em **0%**, o cartão mostra o **saldo médio real** (é o comportamento normal).
+- Ao digitar um percentual, o programa **recalcula o saldo médio** aplicando aquela variação. Use **valores positivos para aumentar** e **negativos para reduzir**.
+
+Exemplo: se o seu faturamento médio é R$ 100.000 e as despesas R$ 70.000 (saldo R$ 30.000), digitar **+10%** em Faturamento mostra o novo saldo de **R$ 40.000**; alternativamente, digitar **−14,29%** em Despesas chega ao mesmo saldo. Assim você descobre quanto precisa vender a mais (ou gastar a menos) para chegar onde quer.
+
+Enquanto a simulação está ativa, aparece abaixo do valor uma linha lembrando os percentuais aplicados e o **saldo real** de referência. Esses campos **não são salvos**: sempre começam em 0% quando você abre o programa, para não confundir dados reais com simulação.
+
+### 8.6 O que é lembrado entre sessões
+
+O filtro de Ano/Mês e o agrupamento (Mês/Ano) escolhido são lembrados entre uma sessão e outra do programa, do mesmo jeito que nas outras abas. Já os **itens marcados** nos painéis e os **percentuais de simulação** **não** são guardados de propósito: cada vez que você abre o programa, os painéis começam **desmarcados** e a simulação zerada, para você marcar/simular apenas o que quer naquele momento.
 
 ---
 

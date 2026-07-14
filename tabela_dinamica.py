@@ -22,6 +22,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QTabWidget,
     QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
     QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox,
+    QDoubleSpinBox,
     QRadioButton, QButtonGroup, QGroupBox, QFileDialog,
     QMessageBox, QTableWidget, QTableWidgetItem,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QSplitter,
@@ -3051,6 +3052,35 @@ class AbaTendencias(QWidget):
         flt.addStretch()
         root.addLayout(flt)
 
+        # ── simulação de meta: % sobre faturamento e despesas ──
+        # linha própria (não cabe junto dos filtros). Não são salvos no config
+        # (começam sempre em 0): com 0/0 o saldo é o atual, valores diferentes
+        # recalculam o saldo médio simulado
+        sim = QHBoxLayout()
+        def _mk_pct(tip):
+            sp = QDoubleSpinBox()
+            sp.setRange(-100.0, 100000.0)
+            sp.setDecimals(2)
+            sp.setSuffix(" %")
+            sp.setValue(0.0)
+            sp.setFixedWidth(95)
+            sp.setToolTip(tip)
+            sp.valueChanged.connect(self._preencher)
+            return sp
+        sim.addWidget(QLabel("Simular meta ►   Faturamento:"))
+        self._sp_fat = _mk_pct("Variação % no faturamento (use negativo para reduzir).")
+        sim.addWidget(self._sp_fat)
+        sim.addSpacing(16)
+        sim.addWidget(QLabel("Despesas:"))
+        self._sp_desp = _mk_pct("Variação % nas despesas (use negativo para reduzir).")
+        sim.addWidget(self._sp_desp)
+        sim.addSpacing(12)
+        lbl_dica = QLabel("(0 = saldo atual; negativo reduz)")
+        lbl_dica.setStyleSheet("color:#888;")
+        sim.addWidget(lbl_dica)
+        sim.addStretch()
+        root.addLayout(sim)
+
         # ── card de destaque: saldo médio por período ─────
         self._card_tend_saldo = self._make_card_destaque("Saldo Médio por Período")
         root.addWidget(self._card_tend_saldo)
@@ -3103,9 +3133,15 @@ class AbaTendencias(QWidget):
         lbl_v = QLabel("—")
         lbl_v.setStyleSheet("font-size:22px;font-weight:bold;color:#1565C0;border:none;")
         lbl_v.setAlignment(Qt.AlignCenter)
+        lbl_sub = QLabel("")  # linha de simulação (aparece só quando há % ≠ 0)
+        lbl_sub.setStyleSheet("font-size:11px;color:#555;border:none;")
+        lbl_sub.setAlignment(Qt.AlignCenter)
+        lbl_sub.setVisible(False)
         lay.addWidget(lbl_t)
         lay.addWidget(lbl_v)
+        lay.addWidget(lbl_sub)
         frame._lbl = lbl_v
+        frame._lbl_sub = lbl_sub
         return frame
 
     def _make_card_painel(self):
@@ -3246,16 +3282,31 @@ class AbaTendencias(QWidget):
         return dias / divisor
 
     def _atualizar_card_destaque(self, df, n_periodos):
-        # saldo médio por período = saldo acumulado (soma de tudo) ÷ nº períodos
-        # — mesma lógica dos 3 painéis, aplicada a todos os lançamentos.
-        total = df["Valor"].sum()
-        media = total / n_periodos if n_periodos else 0.0
+        # saldo médio por período = saldo acumulado (soma de tudo) ÷ nº períodos.
+        # Simulação: aplica os % das caixas sobre faturamento (positivos) e
+        # despesas (negativos). Com 0/0 o resultado é o saldo real.
+        faturamento = df[df["Valor"] > 0]["Valor"].sum()
+        despesas    = df[df["Valor"] < 0]["Valor"].sum()   # já é negativo
+        f = self._sp_fat.value()  / 100.0
+        d = self._sp_desp.value() / 100.0
+        total_sim = faturamento * (1 + f) + despesas * (1 + d)
+        media = total_sim / n_periodos if n_periodos else 0.0
         cor = "#1b5e20" if media >= 0 else "#c62828"
         self._card_tend_saldo._lbl.setText(f"{fmt_valor(media)} por período")
         self._card_tend_saldo.setStyleSheet(
             f"QFrame{{background:#f5f5f5;border:2px solid {cor};border-radius:8px;}}")
         self._card_tend_saldo._lbl.setStyleSheet(
             f"font-size:22px;font-weight:bold;color:{cor};border:none;")
+        # subtítulo: só quando há simulação ativa, mostra o saldo real de referência
+        sub = self._card_tend_saldo._lbl_sub
+        if f != 0 or d != 0:
+            real = (faturamento + despesas) / n_periodos if n_periodos else 0.0
+            sub.setText(f"simulação (faturamento {self._sp_fat.value():+.2f}%, "
+                        f"despesas {self._sp_desp.value():+.2f}%)  •  "
+                        f"saldo real: {fmt_valor(real)} por período")
+            sub.setVisible(True)
+        else:
+            sub.setVisible(False)
 
     def _atualizar_card_painel(self, painel, df, n_periodos):
         col, lst, card = painel["col"], painel["lst"], painel["card"]
