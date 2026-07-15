@@ -21,7 +21,8 @@ except ImportError:
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QTabWidget,
     QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
-    QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox,
+    QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox,
+    QDoubleSpinBox,
     QRadioButton, QButtonGroup, QGroupBox, QFileDialog,
     QMessageBox, QTableWidget, QTableWidgetItem,
     QTreeWidget, QTreeWidgetItem, QHeaderView, QSplitter,
@@ -744,8 +745,13 @@ class AbaForm(QWidget):
             ("Descricao",     "Descrição",                   False),
             ("Valor",         "Valor",                       False),
         ]
+        # colunas 0 e 3 são espaçadores elásticos: centralizam o bloco
+        # rótulo(1) + campo(2) horizontalmente, deixando o formulário mais
+        # próximo do centro da tela
+        form.setColumnStretch(0, 1)
+        form.setColumnStretch(3, 1)
         for row_idx, (key, lbl_txt, is_combo) in enumerate(specs):
-            form.addWidget(QLabel(lbl_txt + ":"), row_idx, 0, Qt.AlignRight)
+            form.addWidget(QLabel(lbl_txt + ":"), row_idx, 1, Qt.AlignRight)
             if is_combo:
                 # combos de Categoria/Sub-Categoria/Transação só permitem
                 # escolher valores já cadastrados (aba "Categorias") —
@@ -757,7 +763,26 @@ class AbaForm(QWidget):
                 w = QLineEdit()
                 if key == "Descricao":
                     w.setMinimumWidth(450)
-            form.addWidget(w, row_idx, 1, Qt.AlignLeft)
+            if key == "Data":
+                # caixa "Hoje": quando marcada, preenche a data de hoje e
+                # bloqueia o campo, evitando erros de digitação de data.
+                # largura FIXA para não "esticar" ao lado da caixa Hoje
+                w.setFixedWidth(170)
+                self._chk_hoje = QCheckBox("Hoje")
+                self._chk_hoje.setToolTip(
+                    "Marcada: preenche a data de hoje automaticamente.\n"
+                    "Desmarque para lançar registros de outras datas.")
+                self._chk_hoje.setChecked(bool(cfg_load().get("data_hoje_auto", True)))
+                self._chk_hoje.toggled.connect(self._on_toggle_hoje)
+                cont = QHBoxLayout()
+                cont.setContentsMargins(0, 0, 0, 0)
+                cont.setSpacing(8)
+                cont.addWidget(w)
+                cont.addWidget(self._chk_hoje)
+                cont.addStretch()
+                form.addLayout(cont, row_idx, 2, Qt.AlignLeft)
+            else:
+                form.addWidget(w, row_idx, 2, Qt.AlignLeft)
             self._campos[key] = w
         # ao trocar a Categoria, a lista de Sub-Categoria deve refletir só
         # as sub-categorias cadastradas para aquela categoria
@@ -778,7 +803,7 @@ class AbaForm(QWidget):
         btn_row.addWidget(self._btn_dup)
         btn_row.addWidget(self._btn_lote)
         btn_row.addStretch()
-        form.addLayout(btn_row, len(specs), 0, 1, 2)
+        form.addLayout(btn_row, len(specs), 1, 1, 2)
         root.addWidget(grp)
 
         # conectar dirty tracking em todos os campos
@@ -866,6 +891,8 @@ class AbaForm(QWidget):
         root.addLayout(exp_row)
 
         self._carregar()
+        # aplica o estado inicial da caixa "Hoje" (preenche/trava a data)
+        self._on_toggle_hoje(self._chk_hoje.isChecked())
 
     # ── campos helpers ────────────────────────────────────
     def _get_text(self, key) -> str:
@@ -892,6 +919,23 @@ class AbaForm(QWidget):
             w.clearEditText()
         else:
             w.clear()
+
+    def _on_toggle_hoje(self, marcada):
+        # toggle feito pelo usuário: guarda a preferência e aplica na hora
+        cfg_save({"data_hoje_auto": bool(marcada)})
+        campo = self._campos["Data"]
+        if marcada:
+            campo.setText(datetime.date.today().strftime("%d/%m/%Y"))
+            campo.setReadOnly(True)
+        else:
+            campo.setReadOnly(False)
+
+    def _set_hoje_silencioso(self, marcada):
+        """Muda o estado da caixa 'Hoje' sem disparar o handler nem alterar a
+        preferência salva (usado ao selecionar/duplicar/limpar registros)."""
+        self._chk_hoje.blockSignals(True)
+        self._chk_hoje.setChecked(bool(marcada))
+        self._chk_hoje.blockSignals(False)
 
     def _atualizar_combos(self):
         """Recarrega Categoria/Sub-Categoria/Transação a partir dos cadastros
@@ -955,6 +999,28 @@ class AbaForm(QWidget):
             cb.blockSignals(False)
 
     # ── ações formulário ──────────────────────────────────
+    def _data_confirmada(self, data_str) -> bool:
+        """Alerta se a data estiver fora da janela configurada (dias no passado /
+        no futuro). Retorna False se o usuário optar por corrigir."""
+        dt = _parse_data(data_str)
+        if dt is None:
+            return True
+        cfg = cfg_load()
+        dias_pas = int(cfg.get("data_aviso_passado", 400))
+        dias_fut = int(cfg.get("data_aviso_futuro", 0))
+        delta = (dt.date() - datetime.date.today()).days
+        if delta > dias_fut:
+            aviso = f"{delta} dia(s) no futuro"
+        elif -delta > dias_pas:
+            aviso = f"{-delta} dia(s) no passado"
+        else:
+            return True
+        resp = QMessageBox.question(
+            self, "Confirmar data",
+            f"A data {data_str} está a {aviso} de hoje.\n\nTem certeza que está correta?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        return resp == QMessageBox.Yes
+
     def _salvar(self):
         row = {k: self._get_text(k) for k in self._campos}
         if not row["Data"]:
@@ -964,6 +1030,8 @@ class AbaForm(QWidget):
         if mes is None:
             QMessageBox.warning(self, "Atenção",
                 "Formato de data inválido.\nUse dd/mm/aaaa ou dd/mm/aaaa hh:mm:ss")
+            return
+        if not self._data_confirmada(row["Data"]):
             return
         try:
             valor = _parse_valor(row["Valor"]) if row["Valor"] else 0.0
@@ -1045,6 +1113,15 @@ class AbaForm(QWidget):
             self._atualizar_subcats_form(preservar=False)
             self._set_text("Sub_Categoria", ultimo["Sub_Categoria"] or "")
             self._set_text("Transacao", ultimo["Transacao"] or "")
+        # caixa "Hoje": num lançamento novo, volta à preferência salva do usuário
+        if getattr(self, "_chk_hoje", None) is not None:
+            prefere_hoje = bool(cfg_load().get("data_hoje_auto", True))
+            self._set_hoje_silencioso(prefere_hoje)
+            if prefere_hoje:
+                self._set_text("Data", datetime.date.today().strftime("%d/%m/%Y"))
+                self._campos["Data"].setReadOnly(True)
+            else:
+                self._campos["Data"].setReadOnly(False)
         self._carregando_selecao = False
         self._edit_id = None
         self._dirty.clear()
@@ -1106,6 +1183,9 @@ class AbaForm(QWidget):
         self._dirty.clear()
         r = sel[0].row()
         self._edit_id = int(self._table.item(r, 0).text())
+        # editando um registro existente: data livre e caixa "Hoje" desmarcada
+        self._set_hoje_silencioso(False)
+        self._campos["Data"].setReadOnly(False)
         self._set_text("Data",          self._table.item(r, 1).text())
         self._set_text("Categoria",     self._table.item(r, 4).text())
         self._atualizar_subcats_form(preservar=False)
@@ -1123,6 +1203,9 @@ class AbaForm(QWidget):
             return
         r = sel[0].row()
         self._carregando_selecao = True
+        # duplicar: data livre e caixa "Hoje" desmarcada (data vem do registro)
+        self._set_hoje_silencioso(False)
+        self._campos["Data"].setReadOnly(False)
         self._set_text("Data",          self._table.item(r, 1).text())
         self._set_text("Categoria",     self._table.item(r, 4).text())
         self._atualizar_subcats_form(preservar=False)
@@ -2042,7 +2125,8 @@ class AbaPivot(QWidget):
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
         df["Mes"]   = pd.to_numeric(df["Mes"],   errors="coerce")
         df["Ano"]   = pd.to_numeric(df["Ano"],   errors="coerce")
-        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
+        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True,
+                                        errors="coerce", format="mixed")
         return df
 
     def _on_toggle_periodo(self, ligado):
@@ -2766,7 +2850,8 @@ class AbaDashboard(QWidget):
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
         df["Mes"]   = pd.to_numeric(df["Mes"],   errors="coerce")
         df["Ano"]   = pd.to_numeric(df["Ano"],   errors="coerce")
-        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
+        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True,
+                                        errors="coerce", format="mixed")
         df = df[df["Ano"] != 1900]
         self._df_full = df
 
@@ -2967,9 +3052,46 @@ class AbaTendencias(QWidget):
         flt.addStretch()
         root.addLayout(flt)
 
+        # ── simulação de meta: % sobre faturamento e despesas ──
+        # linha própria (não cabe junto dos filtros). Não são salvos no config
+        # (começam sempre em 0): com 0/0 o saldo é o atual, valores diferentes
+        # recalculam o saldo médio simulado
+        sim = QHBoxLayout()
+        def _mk_pct(tip):
+            sp = QDoubleSpinBox()
+            sp.setRange(-100.0, 100000.0)
+            sp.setDecimals(2)
+            sp.setSuffix(" %")
+            sp.setValue(0.0)
+            sp.setFixedWidth(95)
+            sp.setToolTip(tip)
+            sp.valueChanged.connect(self._preencher)
+            return sp
+        sim.addWidget(QLabel("Simular meta ►   Faturamento:"))
+        self._sp_fat = _mk_pct("Variação % no faturamento (use negativo para reduzir).")
+        sim.addWidget(self._sp_fat)
+        sim.addSpacing(16)
+        sim.addWidget(QLabel("Despesas:"))
+        self._sp_desp = _mk_pct("Variação % nas despesas (use negativo para reduzir).")
+        sim.addWidget(self._sp_desp)
+        sim.addSpacing(12)
+        lbl_dica = QLabel("(0 = saldo atual; negativo reduz)")
+        lbl_dica.setStyleSheet("color:#888;")
+        sim.addWidget(lbl_dica)
+        sim.addStretch()
+        root.addLayout(sim)
+
         # ── card de destaque: saldo médio por período ─────
         self._card_tend_saldo = self._make_card_destaque("Saldo Médio por Período")
         root.addWidget(self._card_tend_saldo)
+
+        # aviso de projeção (aparece só quando o período é menor que 1 mês/ano)
+        self._lbl_previsao = QLabel("")
+        self._lbl_previsao.setStyleSheet(
+            "color:#c62828;font-size:11px;font-weight:bold;border:none;")
+        self._lbl_previsao.setWordWrap(True)
+        self._lbl_previsao.setVisible(False)
+        root.addWidget(self._lbl_previsao)
 
         # ── 3 painéis: Categoria / Sub-Categoria / Transação
         paineis_row = QHBoxLayout()
@@ -3011,9 +3133,15 @@ class AbaTendencias(QWidget):
         lbl_v = QLabel("—")
         lbl_v.setStyleSheet("font-size:22px;font-weight:bold;color:#1565C0;border:none;")
         lbl_v.setAlignment(Qt.AlignCenter)
+        lbl_sub = QLabel("")  # linha de simulação (aparece só quando há % ≠ 0)
+        lbl_sub.setStyleSheet("font-size:11px;color:#555;border:none;")
+        lbl_sub.setAlignment(Qt.AlignCenter)
+        lbl_sub.setVisible(False)
         lay.addWidget(lbl_t)
         lay.addWidget(lbl_v)
+        lay.addWidget(lbl_sub)
         frame._lbl = lbl_v
+        frame._lbl_sub = lbl_sub
         return frame
 
     def _make_card_painel(self):
@@ -3119,7 +3247,8 @@ class AbaTendencias(QWidget):
         df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
         df["Mes"]   = pd.to_numeric(df["Mes"],   errors="coerce")
         df["Ano"]   = pd.to_numeric(df["Ano"],   errors="coerce")
-        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
+        df["_DataDT"] = pd.to_datetime(df["Data"], dayfirst=True,
+                                        errors="coerce", format="mixed")
         df = df[df["Ano"] != 1900]
         self._df_full = df
 
@@ -3137,25 +3266,47 @@ class AbaTendencias(QWidget):
         self._popular_listas()
         self._preencher()
 
-    def _contar_periodos(self, df, gran):
-        d = df.dropna(subset=["Ano", "Mes"])
+    def _qte_periodos(self, df, gran):
+        """Número de períodos com base nos DIAS CORRIDOS entre o primeiro e o
+        último lançamento: dias/30,417 (meses) ou dias/365,25 (anos). Assim um
+        intervalo que cruza a virada do mês (ex.: 16/jun a 15/jul) conta como
+        ~1 mês, e não como 2. Para períodos menores que 1, o valor vira uma
+        projeção (ex.: 15 dias ≈ 0,49 mês)."""
+        d = df.dropna(subset=["_DataDT"])
         if d.empty:
-            return 0
-        if gran == "Mês":
-            return d[["Ano", "Mes"]].drop_duplicates().shape[0]
-        return d["Ano"].drop_duplicates().shape[0]
+            return 0.0
+        dias = (d["_DataDT"].max() - d["_DataDT"].min()).days + 1
+        if dias < 1:
+            dias = 1
+        divisor = 365.25 if gran == "Ano" else 30.417
+        return dias / divisor
 
     def _atualizar_card_destaque(self, df, n_periodos):
-        # saldo médio por período = saldo acumulado (soma de tudo) ÷ nº períodos
-        # — mesma lógica dos 3 painéis, aplicada a todos os lançamentos.
-        total = df["Valor"].sum()
-        media = total / n_periodos if n_periodos else 0.0
+        # saldo médio por período = saldo acumulado (soma de tudo) ÷ nº períodos.
+        # Simulação: aplica os % das caixas sobre faturamento (positivos) e
+        # despesas (negativos). Com 0/0 o resultado é o saldo real.
+        faturamento = df[df["Valor"] > 0]["Valor"].sum()
+        despesas    = df[df["Valor"] < 0]["Valor"].sum()   # já é negativo
+        f = self._sp_fat.value()  / 100.0
+        d = self._sp_desp.value() / 100.0
+        total_sim = faturamento * (1 + f) + despesas * (1 + d)
+        media = total_sim / n_periodos if n_periodos else 0.0
         cor = "#1b5e20" if media >= 0 else "#c62828"
         self._card_tend_saldo._lbl.setText(f"{fmt_valor(media)} por período")
         self._card_tend_saldo.setStyleSheet(
             f"QFrame{{background:#f5f5f5;border:2px solid {cor};border-radius:8px;}}")
         self._card_tend_saldo._lbl.setStyleSheet(
             f"font-size:22px;font-weight:bold;color:{cor};border:none;")
+        # subtítulo: só quando há simulação ativa, mostra o saldo real de referência
+        sub = self._card_tend_saldo._lbl_sub
+        if f != 0 or d != 0:
+            real = (faturamento + despesas) / n_periodos if n_periodos else 0.0
+            sub.setText(f"simulação (faturamento {self._sp_fat.value():+.2f}%, "
+                        f"despesas {self._sp_desp.value():+.2f}%)  •  "
+                        f"saldo real: {fmt_valor(real)} por período")
+            sub.setVisible(True)
+        else:
+            sub.setVisible(False)
 
     def _atualizar_card_painel(self, painel, df, n_periodos):
         col, lst, card = painel["col"], painel["lst"], painel["card"]
@@ -3186,10 +3337,20 @@ class AbaTendencias(QWidget):
             df = df[(df["_DataDT"].dt.date >= de) & (df["_DataDT"].dt.date <= ate)]
 
         gran = self._cb_gran.currentText()
-        n_periodos = self._contar_periodos(df, gran)
+        n_periodos = self._qte_periodos(df, gran)
         self._atualizar_card_destaque(df, n_periodos)
         for painel in self._paineis:
             self._atualizar_card_painel(painel, df, n_periodos)
+
+        # aviso de projeção quando há menos de 1 período completo de dados
+        if 0 < n_periodos < 1:
+            unidade = "um ano" if gran == "Ano" else "um mês"
+            self._lbl_previsao.setText(
+                f"⚠ Há menos de {unidade} de dados: os valores acima são uma "
+                f"projeção (estimativa para {unidade} inteiro, mantido o ritmo atual).")
+            self._lbl_previsao.setVisible(True)
+        else:
+            self._lbl_previsao.setVisible(False)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -3263,6 +3424,35 @@ class AbaConfiguracoes(QWidget):
             "Mantém automaticamente os 10 backups mais recentes (os mais antigos "
             "são apagados)."))
         root.addWidget(grp_backup)
+
+        # ── Validação de datas (aba Dados) ────────────────────
+        grp_dt = QGroupBox("Validação de datas (aba Dados)")
+        lay_dt = QVBoxLayout(grp_dt)
+        lay_dt.addWidget(QLabel(
+            "Ao salvar um lançamento, o programa avisa se a data digitada estiver "
+            "muito longe de hoje (ajuda a pegar erros como o ano trocado)."))
+        cfg = cfg_load()
+        r1 = QHBoxLayout()
+        r1.addWidget(QLabel("Avisar se a data estiver mais de"))
+        self._sp_pas = QSpinBox(); self._sp_pas.setRange(0, 100000)
+        self._sp_pas.setValue(int(cfg.get("data_aviso_passado", 400)))
+        self._sp_pas.setSuffix(" dias")
+        self._sp_pas.valueChanged.connect(
+            lambda v: cfg_save({"data_aviso_passado": int(v)}))
+        r1.addWidget(self._sp_pas)
+        r1.addWidget(QLabel("no passado")); r1.addStretch()
+        lay_dt.addLayout(r1)
+        r2 = QHBoxLayout()
+        r2.addWidget(QLabel("Avisar se a data estiver mais de"))
+        self._sp_fut = QSpinBox(); self._sp_fut.setRange(0, 100000)
+        self._sp_fut.setValue(int(cfg.get("data_aviso_futuro", 0)))
+        self._sp_fut.setSuffix(" dias")
+        self._sp_fut.valueChanged.connect(
+            lambda v: cfg_save({"data_aviso_futuro": int(v)}))
+        r2.addWidget(self._sp_fut)
+        r2.addWidget(QLabel("no futuro  (0 = qualquer data futura avisa)")); r2.addStretch()
+        lay_dt.addLayout(r2)
+        root.addWidget(grp_dt)
 
         root.addStretch()
 
