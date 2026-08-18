@@ -28,10 +28,10 @@ from PyQt5.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QHeaderView, QSplitter,
     QAbstractItemView, QStatusBar, QFrame,
     QMenu, QWidgetAction, QDateEdit, QListWidget, QListWidgetItem,
-    QInputDialog, QDialog, QDialogButtonBox,
+    QInputDialog, QDialog, QDialogButtonBox, QShortcut,
 )
 from PyQt5.QtCore import Qt, QSize, QSortFilterProxyModel, QDate
-from PyQt5.QtGui import QColor, QBrush, QFont
+from PyQt5.QtGui import QColor, QBrush, QFont, QKeySequence
 
 def _app_dir() -> str:
     """Retorna a pasta do .exe (quando compilado) ou do .py (em desenvolvimento)."""
@@ -471,6 +471,31 @@ def deletar(rid):
     con.close()
 
 
+def inserir_registro(tup):
+    """Reinsere um registro completo preservando o id (usado no 'Desfazer' de
+    uma exclusão). tup = (id, Data, Mes, Ano, Categoria, Sub_Categoria,
+    Transacao, Descricao, Valor)."""
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        "INSERT OR REPLACE INTO registros "
+        "(id,Data,Mes,Ano,Categoria,Sub_Categoria,Transacao,Descricao,Valor)"
+        " VALUES (?,?,?,?,?,?,?,?,?)", tup)
+    con.commit()
+    con.close()
+
+
+def restaurar_registro(tup):
+    """Restaura todos os campos de um registro existente (usado no 'Desfazer'
+    de uma edição). Mesma ordem de tupla de inserir_registro."""
+    con = sqlite3.connect(DB_PATH)
+    con.execute(
+        "UPDATE registros SET Data=?,Mes=?,Ano=?,Categoria=?,Sub_Categoria=?,"
+        "Transacao=?,Descricao=?,Valor=? WHERE id=?",
+        (tup[1], tup[2], tup[3], tup[4], tup[5], tup[6], tup[7], tup[8], tup[0]))
+    con.commit()
+    con.close()
+
+
 def buscar_todos():
     con = sqlite3.connect(DB_PATH)
     cur = con.execute("SELECT * FROM registros ORDER BY Data")
@@ -722,6 +747,7 @@ class AbaForm(QWidget):
         self._all_rows = []   # cache completo para filtro local
         self._dirty    = set()  # campos modificados pelo usuário desde última seleção
         self._auto_ajuste_feito = False  # auto-ajuste de colunas só na 1ª carga
+        self._undo = None     # última operação reversível: (tipo, dados)
         self._build()
 
     # ── construção ────────────────────────────────────────
@@ -795,6 +821,9 @@ class AbaForm(QWidget):
         self._btn_excluir = _btn("Excluir Selecionado","#f44336", self._excluir, 150)
         self._btn_dup     = _btn("Duplicar Selecionado","#00897B", self._duplicar, 150)
         self._btn_lote    = _btn("Aplicar a Selecionados", "#E65100", self._aplicar_lote, 160)
+        self._btn_desfazer = _btn("↶ Desfazer", "#607D8B", self._desfazer, 120)
+        self._btn_desfazer.setEnabled(False)
+        self._btn_desfazer.setToolTip("Desfaz a última operação (Ctrl+Z)")
         self._btn_lote.setVisible(False)
         self._btn_dup.setVisible(False)
         btn_row.addWidget(self._btn_salvar)
@@ -802,9 +831,12 @@ class AbaForm(QWidget):
         btn_row.addWidget(self._btn_excluir)
         btn_row.addWidget(self._btn_dup)
         btn_row.addWidget(self._btn_lote)
+        btn_row.addWidget(self._btn_desfazer)
         btn_row.addStretch()
         form.addLayout(btn_row, len(specs), 1, 1, 2)
         root.addWidget(grp)
+        # atalho Ctrl+Z para desfazer a última operação
+        QShortcut(QKeySequence("Ctrl+Z"), self, self._desfazer)
 
         # conectar dirty tracking em todos os campos
         for key, w in self._campos.items():
@@ -1041,16 +1073,27 @@ class AbaForm(QWidget):
         row["Valor"] = valor
         edit_id = self._edit_id
         if edit_id:
+            # confirmação antes de atualizar (como no "Aplicar a Selecionados")
+            if QMessageBox.question(
+                    self, "Confirmar atualização",
+                    "Atualizar este registro com os novos dados?",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No) != QMessageBox.Yes:
+                return
+            # guarda o estado anterior para o "Desfazer"
+            antes = next((r for r in self._all_rows if r[0] == edit_id), None)
             atualizar(edit_id, row)
             nova = (edit_id, row["Data"], mes, ano, row["Categoria"],
                     row["Sub_Categoria"], row["Transacao"], row["Descricao"], valor)
             self._all_rows = [nova if r[0] == edit_id else r
                               for r in self._all_rows]
+            if antes is not None:
+                self._registrar_undo("update", [antes])
         else:
             new_id = inserir(row)
             nova = (new_id, row["Data"], mes, ano, row["Categoria"],
                     row["Sub_Categoria"], row["Transacao"], row["Descricao"], valor)
             self._all_rows.append(nova)
+            self._registrar_undo("insert", [new_id])
         # combos do formulário e dos filtros (cálculo barato)
         self._atualizar_combos()
         self._atualizar_filtros_combo()
@@ -1141,9 +1184,12 @@ class AbaForm(QWidget):
                                 QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
             rids = [int(self._table.item(idx.row(), 0).text()) for idx in sel]
             linhas = sorted((idx.row() for idx in sel), reverse=True)
+            rids_set = set(rids)
+            # guarda os registros excluídos para o "Desfazer"
+            excluidos = [r for r in self._all_rows if r[0] in rids_set]
             for rid in rids:
                 deletar(rid)
-            rids_set = set(rids)
+            self._registrar_undo("delete", excluidos)
             self._all_rows = [r for r in self._all_rows if r[0] not in rids_set]
             # se o banco ficou vazio, deletar() reinsere o registro dummy:
             # nesse caso faz uma recarga completa para refleti-lo
@@ -1160,6 +1206,42 @@ class AbaForm(QWidget):
             self._atualizar_filtros_combo()
             self._atualizar_soma_status()
             self._limpar()
+
+    # ── desfazer (Ctrl+Z) ─────────────────────────────────
+    def _registrar_undo(self, tipo, dados):
+        """Guarda a última operação reversível e habilita o botão Desfazer."""
+        self._undo = (tipo, list(dados))
+        rotulos = {"insert": "inclusão", "update": "edição",
+                   "delete": "exclusão", "lote": "edição em lote"}
+        self._btn_desfazer.setEnabled(True)
+        self._btn_desfazer.setToolTip(
+            f"Desfazer última operação: {rotulos.get(tipo, tipo)}  (Ctrl+Z)")
+
+    def _desfazer(self):
+        if not self._undo:
+            return
+        tipo, dados = self._undo
+        rotulos = {"insert": "inclusão", "update": "edição",
+                   "delete": "exclusão", "lote": "edição em lote"}
+        if QMessageBox.question(
+                self, "Desfazer",
+                f"Desfazer a última operação ({rotulos.get(tipo, tipo)})?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes) != QMessageBox.Yes:
+            return
+        if tipo == "insert":
+            for rid in dados:
+                deletar(rid)
+        elif tipo == "delete":
+            for tup in dados:
+                inserir_registro(tup)
+        else:  # update / lote → restaura os valores anteriores
+            for tup in dados:
+                restaurar_registro(tup)
+        self._undo = None
+        self._btn_desfazer.setEnabled(False)
+        self._btn_desfazer.setToolTip("Desfaz a última operação (Ctrl+Z)")
+        self._limpar()
+        self._carregar()
 
     def _marcar_dirty(self, key):
         # ignora mudanças causadas programaticamente durante _on_select
@@ -1238,6 +1320,10 @@ class AbaForm(QWidget):
         if QMessageBox.question(self, "Confirmar edição em lote", msg,
                                 QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
             return
+        # guarda o estado anterior dos registros afetados para o "Desfazer"
+        rids_set = set(rids)
+        antes = [r for r in self._all_rows if r[0] in rids_set]
+        self._registrar_undo("lote", antes)
         # busca registro completo e substitui apenas os campos dirty
         con = sqlite3.connect(DB_PATH)
         for rid in rids:

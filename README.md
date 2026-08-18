@@ -101,11 +101,14 @@ A aba é dividida em três partes, de cima para baixo:
 
 | Botão | O que faz |
 |---|---|
-| **Salvar** | Grava o lançamento novo no banco de dados (ou atualiza, se você estiver editando um existente — nesse caso o botão muda o texto para "Atualizar") |
+| **Salvar** | Grava o lançamento novo no banco de dados (ou atualiza, se você estiver editando um existente — nesse caso o botão muda o texto para "Atualizar"). Ao **atualizar** um registro, o programa **pede confirmação** antes de aplicar a mudança, para evitar alterações acidentais |
 | **Limpar** | Limpa o formulário. Ao limpar, o programa já **pré-preenche Data, Categoria, Sub-Categoria e Transação com os mesmos valores do último lançamento salvo**, deixando só Descrição e Valor em branco — isso agiliza muito quando você está lançando vários gastos parecidos em sequência (ex: vários itens de supermercado no mesmo dia) |
 | **Excluir Selecionado** | Exclui o(s) registro(s) atualmente selecionados na tabela abaixo (pede confirmação) |
 | **Duplicar Selecionado** | Copia **todos** os campos (inclusive Descrição e Valor) do registro selecionado na tabela para o formulário, como se fosse um novo lançamento. Útil quando você tem um gasto idêntico a um já cadastrado (ex: o mesmo aluguel todo mês) — você só ajusta a data e salva |
 | **Aplicar a Selecionados** | Aparece quando você seleciona **mais de um** registro na tabela. Permite alterar um ou mais campos (ex: trocar a Categoria de vários lançamentos de uma vez) em lote |
+| **↶ Desfazer** | Desfaz a **última operação** feita na aba Dados — seja uma inclusão, uma edição, uma exclusão ou uma edição em lote. Fica disponível logo após a operação (o atalho de teclado **Ctrl+Z** faz o mesmo). É a sua rede de segurança: excluiu ou editou algo sem querer? Um clique e volta ao que era |
+
+> 💡 **Desfazer (Ctrl+Z):** o programa guarda **a última** operação. Se você fizer uma exclusão e depois uma edição, o "Desfazer" reverte a edição (a mais recente). Para exclusões que esvaziaram vários registros, o Desfazer traz todos de volta com os mesmos dados.
 
 > **Como editar um lançamento já existente?** Basta clicar nele na tabela abaixo — o formulário é preenchido automaticamente com os dados daquele registro e o botão muda para "Atualizar". Faça as alterações e clique em "Atualizar".
 
