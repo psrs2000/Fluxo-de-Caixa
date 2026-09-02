@@ -132,9 +132,19 @@ Mostra todos os lançamentos que passam pelo filtro atual. Você pode:
 - **Clicar em uma linha** para selecioná-la (carrega no formulário para edição)
 - **Selecionar várias linhas** (Ctrl+clique ou Shift+clique) para excluir ou editar em lote
 
-No cabeçalho da coluna **Valor**, o programa sempre mostra a **soma de todos os valores atualmente visíveis** — ou seja, se você aplicar um filtro, a soma se atualiza para refletir só o que está filtrado. Isso é uma forma rápida de, por exemplo, saber "quanto gastei em Alimentação em junho" sem nem precisar ir à Tabela Dinâmica.
+No cabeçalho da coluna **Valor**, o programa sempre mostra a **soma de todos os lançamentos que passaram pelo filtro** — ou seja, se você aplicar um filtro, a soma se atualiza para refletir só o que está filtrado. Isso é uma forma rápida de, por exemplo, saber "quanto gastei em Alimentação em junho" sem nem precisar ir à Tabela Dinâmica.
 
 Abaixo da tabela, uma linha de status mostra quantos registros estão sendo exibidos do total.
+
+> ⚡ **Por que a tabela mostra só os lançamentos mais recentes?**
+> Para a tela continuar rápida mesmo quando a sua base cresce muito, a aba Dados exibe por padrão os **500 lançamentos mais recentes**. Isso é apenas um limite **de exibição** — nada é perdido nem escondido do programa:
+>
+> - Os **filtros continuam procurando na base inteira**. Se você filtrar por "Aluguel", ele varre todos os lançamentos e mostra os resultados (os mais recentes, se forem muitos).
+> - A **soma do cabeçalho considera todos os encontrados**, não só os que aparecem na tela.
+> - Todas as outras abas (Tabela Dinâmica, Dashboard, Médias) usam **sempre a base completa**.
+> - Para ver ou trabalhar com a base inteira de uma vez, use **Exportar XLSX/CSV** (e, se quiser, edite fora e traga de volta pela aba Importar).
+>
+> Quando a exibição está limitada, a linha de status avisa (ex.: *"Exibindo os 500 lançamentos mais recentes de 24.915 encontrados"*). Você pode mudar esse limite — ou desligá-lo — na aba **Configurações** (seção 9.5).
 
 ---
 
@@ -416,6 +426,16 @@ Aqui você define o que é "muito longe":
 - **Avisar se a data estiver mais de [N] dias no futuro** — padrão **0 dias**, ou seja, **qualquer data futura** dispara o aviso. Aumente esse número se você costuma lançar datas futuras (ex.: contas a vencer).
 
 Esse aviso funciona em conjunto com a caixa **"Hoje"** da aba Dados: com ela marcada, a data já entra correta (hoje) e o aviso nem precisa aparecer; ao desmarcá-la para digitar datas antigas, o aviso é a sua rede de proteção.
+
+### 9.5 Desempenho (aba Dados)
+
+Conforme a sua base cresce, desenhar **todos** os lançamentos na tela da aba Dados fica lento. Por isso o programa exibe ali apenas os **mais recentes** — por padrão, **500**.
+
+Aqui você ajusta esse número em **"Exibir no máximo [N] lançamentos na tabela"**. Use **0** para desligar o limite e mostrar tudo (não recomendado com bases grandes). A mudança vale quando a aba Dados for recarregada.
+
+> Lembre-se: o limite é só **de exibição**. Os filtros continuam varrendo a base inteira, a soma do cabeçalho considera todos os lançamentos encontrados, e as abas Tabela Dinâmica, Dashboard e Médias sempre usam a base completa. Para ver tudo de uma vez, use **Exportar XLSX/CSV**.
+
+Para se ter uma ideia do ganho, com uma base de **100 mil lançamentos**: abrir o programa caiu de ~28 s para ~2 s, e salvar um lançamento caiu de ~5 s para menos de **0,1 s**.
 
 ---
 
