@@ -1425,9 +1425,18 @@ class AbaForm(QWidget):
         hdr_item.setText(f"Valor  |  {fmt_valor(soma)}")
         hdr_item.setForeground(QBrush(QColor(cor_hex)))
         total = len(self._all_rows)
-        self._status.setText(
-            f"Exibindo {vis} de {total} registros" +
-            (f"  |  filtro ativo" if vis < total else ""))
+        mostrados = self._table.rowCount()
+        if mostrados < vis:
+            # exibição limitada: a soma acima considera TODOS os encontrados
+            self._status.setText(
+                f"Exibindo os {mostrados} lançamentos mais recentes de {vis} "
+                f"encontrados" + (f" (base com {total})" if vis < total else "") +
+                "  —  use os filtros para chegar aos demais "
+                "(a soma acima considera todos os encontrados)")
+        else:
+            self._status.setText(
+                f"Exibindo {vis} de {total} registros" +
+                (f"  |  filtro ativo" if vis < total else ""))
 
     def _ajustar_larguras(self):
         """Restaura larguras salvas ou auto-ajusta apenas na 1ª carga da sessão."""
@@ -1450,14 +1459,30 @@ class AbaForm(QWidget):
             self._auto_ajuste_feito = True
         hdr.sectionResized.connect(self._salvar_layout)
 
+    @staticmethod
+    def _chave_recencia(r):
+        """Chave de ordenação por data (mais recente primeiro). Usa Ano/Mes já
+        gravados e o dia extraído do texto — barato mesmo com muitos registros."""
+        try:
+            dia = int(str(r[1])[0:2])
+        except (ValueError, TypeError):
+            dia = 0
+        return (r[3] or 0, r[2] or 0, dia, r[0] or 0)
+
     def _aplicar_filtro(self):
         crit = self._criterios_filtro()
+        # o filtro varre a BASE INTEIRA; o limite é só de exibição
+        filtradas = [r for r in self._all_rows if self._passa_filtro(r, crit)]
+        limite = int(cfg_load().get("dados_max_linhas", 500))
+        if limite > 0 and len(filtradas) > limite:
+            # mostra os mais recentes por data (os demais seguem no banco e
+            # continuam sendo somados/encontrados pelos filtros)
+            filtradas.sort(key=self._chave_recencia, reverse=True)
+            filtradas = filtradas[:limite]
         self._table.setSortingEnabled(False)
         self._table.setRowCount(0)
-        for r in self._all_rows:
+        for r in filtradas:
             # r = (id, Data, Mes, Ano, Categoria, Sub_Categoria, Transacao, Descricao, Valor)
-            if not self._passa_filtro(r, crit):
-                continue
             i = self._table.rowCount()
             self._table.insertRow(i)
             self._montar_item_linha(i, r)
@@ -3539,6 +3564,27 @@ class AbaConfiguracoes(QWidget):
         r2.addWidget(QLabel("no futuro  (0 = qualquer data futura avisa)")); r2.addStretch()
         lay_dt.addLayout(r2)
         root.addWidget(grp_dt)
+
+        # ── Desempenho da aba Dados ──────────────────────────
+        grp_perf = QGroupBox("Desempenho (aba Dados)")
+        lay_perf = QVBoxLayout(grp_perf)
+        lay_perf.addWidget(QLabel(
+            "Para a tela continuar rápida mesmo com muitos lançamentos, a aba Dados "
+            "exibe apenas os mais recentes. Os filtros e as somas continuam usando "
+            "a base inteira; para ver tudo, use Exportar XLSX/CSV."))
+        r3 = QHBoxLayout()
+        r3.addWidget(QLabel("Exibir no máximo"))
+        self._sp_linhas = QSpinBox(); self._sp_linhas.setRange(0, 1000000)
+        self._sp_linhas.setValue(int(cfg.get("dados_max_linhas", 500)))
+        self._sp_linhas.setSingleStep(100)
+        self._sp_linhas.setSuffix(" lançamentos")
+        self._sp_linhas.valueChanged.connect(
+            lambda v: cfg_save({"dados_max_linhas": int(v)}))
+        r3.addWidget(self._sp_linhas)
+        r3.addWidget(QLabel("na tabela  (0 = sem limite; mudança vale ao reabrir a aba)"))
+        r3.addStretch()
+        lay_perf.addLayout(r3)
+        root.addWidget(grp_perf)
 
         root.addStretch()
 
