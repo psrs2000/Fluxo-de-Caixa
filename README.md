@@ -1,8 +1,55 @@
-# Fluxo de Caixa
+# 💰 Fluxo de Caixa
 
-Programa de controle financeiro pessoal (ou de pequenos negócios), em PyQt5, com o poder de uma Tabela Dinâmica do Excel — sem precisar escrever nenhuma fórmula.
+**Controle financeiro pessoal e de pequenos negócios — com o poder de uma Tabela Dinâmica do Excel, sem escrever uma única fórmula.**
 
-📄 Este README contém o manual completo do usuário. Se preferir, há também uma versão em PDF: [`Manual_Tabela_Dinamica.pdf`](Manual_Tabela_Dinamica.pdf).
+![Licença MIT](https://img.shields.io/badge/licença-MIT-green) ![Python](https://img.shields.io/badge/Python-3.8%2B-blue) ![Plataforma](https://img.shields.io/badge/Windows-desktop-lightgrey) ![Dados locais](https://img.shields.io/badge/dados-100%25%20locais-success)
+
+![Tela principal do programa](manual_assets/01_aba_dados.png)
+
+## O que é
+
+Você registra suas **entradas e saídas de dinheiro** e o programa cruza esses dados de todas as formas possíveis — por categoria, por mês, por ano, por tipo de transação — **automaticamente**.
+
+Foi feito pensando em quem **não tem intimidade com planilhas**: tudo se faz escolhendo opções em menus, sem fórmulas, sem configuração complicada.
+
+## Para que serve
+
+- *Quanto gastei em Alimentação no mês passado?*
+- *Qual foi minha maior despesa do ano?*
+- *Em média, quanto sobra por mês?*
+- *Se eu aumentar o faturamento em 10%, como fica meu saldo?*
+
+## Principais recursos
+
+| | |
+|---|---|
+| 📊 **Tabela Dinâmica** | Cruze qualquer dimensão (categoria × mês, transação × ano…), com totais, percentuais e exportação |
+| 📈 **Dashboard** | Visão rápida do mês: entradas, saídas, saldo e os maiores gastos |
+| 🧮 **Médias** | Quanto você gasta/recebe por mês em média — com simulador de metas |
+| 📥 **Importação** | Traga lançamentos de planilhas Excel ou CSV de uma vez |
+| 🛟 **À prova de erros** | Confirmações, desfazer (Ctrl+Z), aviso de data suspeita e backup automático |
+| 🔒 **Privado** | Seus dados ficam **só no seu computador** (arquivo SQLite). Nada é enviado para a internet |
+
+## Como usar
+
+### Opção 1 — Executável pronto (recomendado)
+
+Baixe o programa na página de **[Releases](../../releases)** e execute. Não precisa instalar Python nem nada.
+
+### Opção 2 — Rodando pelo código
+
+```bash
+pip install -r requirements.txt
+python tabela_dinamica.py
+```
+
+## Documentação
+
+O **manual completo do usuário** está logo abaixo neste README — e também em PDF: **[Manual_Tabela_Dinamica.pdf](Manual_Tabela_Dinamica.pdf)**.
+
+## Licença
+
+Distribuído sob a licença **[MIT](LICENSE)** — use, modifique e distribua à vontade.
 
 ---
 
