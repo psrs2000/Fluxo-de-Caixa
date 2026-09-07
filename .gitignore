@@ -10,3 +10,7 @@ __pycache__/
 build/
 dist/
 *.spec
+
+# Protótipo web: banco de teste local
+web/dados.db
+web/__pycache__/
