@@ -409,6 +409,23 @@ def _parse_data(data_str: str):
     return None
 
 
+def _normalizar_data(raw) -> str:
+    """Padroniza a data importada para dd/mm/aaaa [hh:mm[:ss]].
+    Planilhas Excel trazem datas como 2026-11-03 19:47:00; convertemos para
+    o mesmo formato dos lançamentos digitados. Se não reconhecer, mantém."""
+    txt = str(raw).strip()
+    if txt.lower() in ("nan", "nat", "none"):
+        return ""
+    d = _parse_data(txt)
+    if d is None:
+        return txt
+    if d.hour == d.minute == d.second == 0:
+        return d.strftime("%d/%m/%Y")
+    if d.second:
+        return d.strftime("%d/%m/%Y %H:%M:%S")
+    return d.strftime("%d/%m/%Y %H:%M")
+
+
 def _parse_valor(raw) -> float:
     """Converte texto em número, aceitando tanto ',' quanto '.' como separador decimal."""
     s = re.sub(r"[R$\s]", "", str(raw).strip())
@@ -648,7 +665,7 @@ def importar_df(df, modo: str):
     con = sqlite3.connect(DB_PATH)
     resolvedor = _ResolvedorCadastros(con)
     for _, r in df.iterrows():
-        data_val = str(r[col_data]).strip() if col_data else ""
+        data_val = _normalizar_data(r[col_data]) if col_data else ""
         mes, ano = _mes_ano(data_val)
         if col_valor:
             try:
