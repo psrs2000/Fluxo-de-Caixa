@@ -409,6 +409,23 @@ def _parse_data(data_str: str):
     return None
 
 
+def _normalizar_data(raw) -> str:
+    """Padroniza a data importada para dd/mm/aaaa [hh:mm[:ss]].
+    Planilhas Excel trazem datas como 2026-11-03 19:47:00; convertemos para
+    o mesmo formato dos lançamentos digitados. Se não reconhecer, mantém."""
+    txt = str(raw).strip()
+    if txt.lower() in ("nan", "nat", "none"):
+        return ""
+    d = _parse_data(txt)
+    if d is None:
+        return txt
+    if d.hour == d.minute == d.second == 0:
+        return d.strftime("%d/%m/%Y")
+    if d.second:
+        return d.strftime("%d/%m/%Y %H:%M:%S")
+    return d.strftime("%d/%m/%Y %H:%M")
+
+
 def _parse_valor(raw) -> float:
     """Converte texto em número, aceitando tanto ',' quanto '.' como separador decimal."""
     s = re.sub(r"[R$\s]", "", str(raw).strip())
@@ -648,7 +665,7 @@ def importar_df(df, modo: str):
     con = sqlite3.connect(DB_PATH)
     resolvedor = _ResolvedorCadastros(con)
     for _, r in df.iterrows():
-        data_val = str(r[col_data]).strip() if col_data else ""
+        data_val = _normalizar_data(r[col_data]) if col_data else ""
         mes, ano = _mes_ano(data_val)
         if col_valor:
             try:
@@ -1694,6 +1711,7 @@ class AbaImport(QWidget):
         )
         btn_imp.setFixedWidth(180)
         btn_imp.clicked.connect(self._importar)
+        self._btn_imp = btn_imp
         btn_layout.addStretch()
         btn_layout.addWidget(btn_imp)
         btn_layout.addStretch()
@@ -1760,19 +1778,34 @@ class AbaImport(QWidget):
             return
         modo = "sobrescrever" if self._rb_ow.isChecked() else "acrescentar"
         if modo == "sobrescrever":
-            if QMessageBox.question(self, "Confirmar",
-                    "Isso apagará TODOS os registros existentes. Continuar?",
-                    QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
-                return
+            msg = "Isso apagará TODOS os registros existentes. Continuar?"
+        else:
+            msg = (f"Acrescentar os registros de\n{os.path.basename(path)}\n"
+                   "à base atual?")
+        if QMessageBox.question(self, "Confirmar", msg,
+                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        # Bloqueia o botão durante a importação (evita cliques repetidos)
+        self._btn_imp.setEnabled(False)
+        QApplication.processEvents()
         try:
             df = self._ler(path)
             importar_df(df, modo)
-            self._status.setText(f"{len(df)} registros importados com sucesso.")
+            # Limpa a seleção: um novo clique não reimporta o mesmo arquivo
+            self._path.clear()
+            self._preview.clear()
+            self._preview.setRowCount(0)
+            self._preview.setColumnCount(0)
+            self._status.setText(
+                f"{len(df)} registros importados com sucesso "
+                f"({os.path.basename(path)}).")
             self._status.setStyleSheet("color:#1b5e20")
             self._aba_form.refresh()
         except Exception as e:
             self._status.setText(f"Erro: {e}")
             self._status.setStyleSheet("color:#c62828")
+        finally:
+            self._btn_imp.setEnabled(True)
 
 
 # ═══════════════════════════════════════════════════════════
