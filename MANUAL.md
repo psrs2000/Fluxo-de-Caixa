@@ -157,7 +157,7 @@ Se você já tem seus lançamentos em uma planilha Excel ou CSV (por exemplo, ex
 2. Se for um `.csv`, confira o **Separador CSV** (geralmente `;` no Brasil, mas pode ser `,` dependendo de como o arquivo foi gerado).
 3. Uma **pré-visualização** das 20 primeiras linhas aparece automaticamente, para você confirmar que o arquivo foi lido corretamente.
 4. Escolha o **modo de importação**:
-   - **Acrescentar ao banco existente** (padrão, seguro) — os novos lançamentos são adicionados aos que já existem.
+   - **Acrescentar ao banco existente** (padrão, seguro) — os novos lançamentos são adicionados aos que já existem. O programa pede confirmação antes de importar e, depois de importar, limpa o arquivo selecionado. Assim, clicar em **Importar** de novo não duplica os lançamentos: para repetir, é preciso escolher o arquivo outra vez.
    - **Sobrescrever banco (apaga tudo antes)** — ⚠️ **apaga todos os lançamentos atuais** antes de importar os novos. Use com cuidado; o programa pede uma confirmação extra antes de executar essa opção.
 5. Clique em **Importar**.
 

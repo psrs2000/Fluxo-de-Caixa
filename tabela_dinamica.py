@@ -1694,6 +1694,7 @@ class AbaImport(QWidget):
         )
         btn_imp.setFixedWidth(180)
         btn_imp.clicked.connect(self._importar)
+        self._btn_imp = btn_imp
         btn_layout.addStretch()
         btn_layout.addWidget(btn_imp)
         btn_layout.addStretch()
@@ -1760,19 +1761,34 @@ class AbaImport(QWidget):
             return
         modo = "sobrescrever" if self._rb_ow.isChecked() else "acrescentar"
         if modo == "sobrescrever":
-            if QMessageBox.question(self, "Confirmar",
-                    "Isso apagará TODOS os registros existentes. Continuar?",
-                    QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
-                return
+            msg = "Isso apagará TODOS os registros existentes. Continuar?"
+        else:
+            msg = (f"Acrescentar os registros de\n{os.path.basename(path)}\n"
+                   "à base atual?")
+        if QMessageBox.question(self, "Confirmar", msg,
+                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        # Bloqueia o botão durante a importação (evita cliques repetidos)
+        self._btn_imp.setEnabled(False)
+        QApplication.processEvents()
         try:
             df = self._ler(path)
             importar_df(df, modo)
-            self._status.setText(f"{len(df)} registros importados com sucesso.")
+            # Limpa a seleção: um novo clique não reimporta o mesmo arquivo
+            self._path.clear()
+            self._preview.clear()
+            self._preview.setRowCount(0)
+            self._preview.setColumnCount(0)
+            self._status.setText(
+                f"{len(df)} registros importados com sucesso "
+                f"({os.path.basename(path)}).")
             self._status.setStyleSheet("color:#1b5e20")
             self._aba_form.refresh()
         except Exception as e:
             self._status.setText(f"Erro: {e}")
             self._status.setStyleSheet("color:#c62828")
+        finally:
+            self._btn_imp.setEnabled(True)
 
 
 # ═══════════════════════════════════════════════════════════
