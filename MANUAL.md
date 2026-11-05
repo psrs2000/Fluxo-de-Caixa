@@ -165,6 +165,8 @@ Se você já tem seus lançamentos em uma planilha Excel ou CSV (por exemplo, ex
 
 O programa procura, no cabeçalho da sua planilha, colunas com nomes parecidos com: `Data`, `Categoria`, `Sub_Categoria`/`Sub-Categoria`, `Transação`, `Descrição` e `Valor` (não precisa ser exatamente igual — maiúsculas/minúsculas e pequenas variações de nome são reconhecidas). Se uma coluna não for encontrada, ela é importada vazia (ou zero, no caso do Valor).
 
+**Datas:** qualquer que seja o formato da planilha (por exemplo, `2026-11-03 19:47:00`, comum em arquivos Excel), a data é gravada no padrão brasileiro `03/11/2026 19:47`, igual aos lançamentos digitados. Datas sem hora ficam só como `03/11/2026`.
+
 > **Dica:** antes de importar uma planilha grande pela primeira vez, teste com uma cópia pequena (5 a 10 linhas) para garantir que as colunas estão sendo reconhecidas corretamente, e só depois importe o arquivo completo.
 
 ---

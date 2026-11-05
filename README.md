@@ -207,13 +207,15 @@ Se você já tem seus lançamentos em uma planilha Excel ou CSV (por exemplo, ex
 2. Se for um `.csv`, confira o **Separador CSV** (geralmente `;` no Brasil, mas pode ser `,` dependendo de como o arquivo foi gerado).
 3. Uma **pré-visualização** das 20 primeiras linhas aparece automaticamente, para você confirmar que o arquivo foi lido corretamente.
 4. Escolha o **modo de importação**:
-   - **Acrescentar ao banco existente** (padrão, seguro) — os novos lançamentos são adicionados aos que já existem.
+   - **Acrescentar ao banco existente** (padrão, seguro) — os novos lançamentos são adicionados aos que já existem. O programa pede confirmação antes de importar e, depois de importar, limpa o arquivo selecionado. Assim, clicar em **Importar** de novo não duplica os lançamentos: para repetir, é preciso escolher o arquivo outra vez.
    - **Sobrescrever banco (apaga tudo antes)** — ⚠️ **apaga todos os lançamentos atuais** antes de importar os novos. Use com cuidado; o programa pede uma confirmação extra antes de executar essa opção.
 5. Clique em **Importar**.
 
 ### Como o programa identifica as colunas
 
 O programa procura, no cabeçalho da sua planilha, colunas com nomes parecidos com: `Data`, `Categoria`, `Sub_Categoria`/`Sub-Categoria`, `Transação`, `Descrição` e `Valor` (não precisa ser exatamente igual — maiúsculas/minúsculas e pequenas variações de nome são reconhecidas). Se uma coluna não for encontrada, ela é importada vazia (ou zero, no caso do Valor).
+
+**Datas:** qualquer que seja o formato da planilha (por exemplo, `2026-11-03 19:47:00`, comum em arquivos Excel), a data é gravada no padrão brasileiro `03/11/2026 19:47`, igual aos lançamentos digitados. Datas sem hora ficam só como `03/11/2026`.
 
 > **Dica:** antes de importar uma planilha grande pela primeira vez, teste com uma cópia pequena (5 a 10 linhas) para garantir que as colunas estão sendo reconhecidas corretamente, e só depois importe o arquivo completo.
 
