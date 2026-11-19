@@ -189,7 +189,7 @@ Abaixo da tabela, uma linha de status mostra quantos registros estão sendo exib
 > - Os **filtros continuam procurando na base inteira**. Se você filtrar por "Aluguel", ele varre todos os lançamentos e mostra os resultados (os mais recentes, se forem muitos).
 > - A **soma do cabeçalho considera todos os encontrados**, não só os que aparecem na tela.
 > - Todas as outras abas (Tabela Dinâmica, Dashboard, Médias) usam **sempre a base completa**.
-> - Para ver ou trabalhar com a base inteira de uma vez, use **Exportar XLSX/CSV** (e, se quiser, edite fora e traga de volta pela aba Importar).
+> - Para ver ou trabalhar com a base inteira de uma vez, use **Exportar XLSX/CSV** (e, se quiser, edite fora e traga de volta pela aba Importar). A exportação leva **todos os lançamentos encontrados pelo filtro**, não só os que aparecem na tela.
 >
 > Quando a exibição está limitada, a linha de status avisa (ex.: *"Exibindo os 500 lançamentos mais recentes de 24.915 encontrados"*). Você pode mudar esse limite — ou desligá-lo — na aba **Configurações** (seção 9.5).
 
@@ -497,7 +497,9 @@ Tanto a aba **Dados** quanto a aba **Tabela Dinâmica** possuem botões de expor
 
 > **Detalhe importante:** ao exportar da aba Dados, as colunas `id`, `Data`, `Mês` e `Ano` são exportadas com o **tipo correto** (número ou data nativa do Excel), e não como texto. Isso significa que você já pode usar fórmulas, somas e filtros do próprio Excel diretamente sobre esses campos, sem precisar converter nada manualmente.
 
-Em ambos os casos, a exportação respeita **exatamente o que está sendo exibido na tela no momento** — ou seja, se você aplicou filtros antes de exportar, só os dados filtrados saem no arquivo.
+Em ambos os casos, a exportação **respeita os filtros**: se você filtrou antes de exportar, só os dados filtrados saem no arquivo.
+
+Na aba **Dados**, a exportação leva **todos os lançamentos que passam no filtro**, mesmo que a tela esteja mostrando só parte deles por causa do limite *"Exibir no máximo"* (seção 9.5). Eles saem na mesma ordem da coluna escolhida na tabela. Exemplo: com o limite em 200 e o filtro Ano = 2026 e Mês = 10 (336 lançamentos), a tela mostra 200, mas o arquivo sai com os **336**. A mensagem de sucesso confirma isso.
 
 ---
 
