@@ -1526,32 +1526,64 @@ class AbaForm(QWidget):
 
     # ── exportação ────────────────────────────────────────
     def _linhas_visiveis(self, tipado=False):
-        """Retorna linhas visíveis; coluna Valor como número puro (sem R$).
+        """Retorna TODAS as linhas que passam no filtro atual (não só as
+        exibidas na tabela, que pode estar limitada por "Exibir no máximo"),
+        na mesma ordem da coluna escolhida na tabela. Valor vai como número
+        puro (sem R$).
 
         Se tipado=True, converte id/Mês/Ano para inteiro e Data para
         datetime, para que o Excel reconheça os campos como numéricos/data
         em vez de texto.
         """
-        rows = []
-        for i in range(self._table.rowCount()):
-            row = []
-            for j in range(self._table.columnCount()):
-                it = self._table.item(i, j)
-                if j == 8 and it:                          # coluna Valor
-                    raw = it.data(Qt.UserRole)
-                    row.append(raw if raw is not None else "")
-                elif tipado and j in (0, 2, 3) and it:     # id, Mês, Ano → int
-                    txt = it.text().strip()
+        crit = self._criterios_filtro()
+        filtradas = [r for r in self._all_rows if self._passa_filtro(r, crit)]
+
+        # mesma ordenação que o usuário vê na tabela
+        hdr = self._table.horizontalHeader()
+        col = hdr.sortIndicatorSection()
+        if 0 <= col < len(COLS_DADOS):
+            desc = hdr.sortIndicatorOrder() == Qt.DescendingOrder
+
+            def chave(r):
+                v = r[col]
+                if col in (0, 2, 3, 8):                    # numéricos
                     try:
-                        row.append(int(float(txt)) if txt != "" else "")
-                    except ValueError:
-                        row.append(txt)
-                elif tipado and j == 1 and it:             # Data → datetime
-                    row.append(_parse_data(it.text()) or it.text())
+                        return float(v)
+                    except (TypeError, ValueError):
+                        return 0.0
+                if col == 1:                               # Data
+                    d = _parse_data(str(v)) if v else None
+                    return float(d.strftime("%Y%m%d%H%M%S")) if d else 0.0
+                return "" if v is None else str(v)
+            filtradas.sort(key=chave, reverse=desc)
+
+        rows = []
+        for r in filtradas:
+            row = []
+            for j, v in enumerate(r):
+                if j == 8:                                 # coluna Valor
+                    row.append(v if v is not None else "")
+                elif tipado and j in (0, 2, 3):            # id, Mês, Ano → int
+                    try:
+                        row.append(int(float(v)) if v not in (None, "") else "")
+                    except (TypeError, ValueError):
+                        row.append(str(v))
+                elif tipado and j == 1:                    # Data → datetime
+                    txt = "" if v is None else str(v)
+                    row.append(_parse_data(txt) or txt)
                 else:
-                    row.append(it.text() if it else "")
+                    row.append("" if v is None else str(v))
             rows.append(row)
         return rows
+
+    def _msg_exportados(self, n, path):
+        exibidos = self._table.rowCount()
+        extra = ""
+        if n > exibidos:
+            extra = (f"\n\n(Todos os {n} encontrados pelo filtro, "
+                     f"não apenas os {exibidos} exibidos na tela.)")
+        QMessageBox.information(self, "Sucesso",
+            f"{n} registros exportados para:\n{path}{extra}")
 
     def _exportar_xlsx(self):
         if not OPENPYXL_OK:
@@ -1575,7 +1607,8 @@ class AbaForm(QWidget):
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill("solid", fgColor="4472C4")
             cell.alignment = Alignment(horizontal="center")
-        for r, row in enumerate(self._linhas_visiveis(tipado=True), 2):
+        linhas = self._linhas_visiveis(tipado=True)
+        for r, row in enumerate(linhas, 2):
             for c, val in enumerate(row, 1):
                 cell = ws.cell(row=r, column=c, value=val)
                 cell.alignment = Alignment(
@@ -1586,8 +1619,7 @@ class AbaForm(QWidget):
             w = max((len(str(c.value or "")) for c in col), default=8)
             ws.column_dimensions[col[0].column_letter].width = min(w + 2, 40)
         wb.save(path)
-        QMessageBox.information(self, "Sucesso",
-            f"{self._table.rowCount()} registros exportados para:\n{path}")
+        self._msg_exportados(len(linhas), path)
 
     def _exportar_csv(self):
         path, _ = QFileDialog.getSaveFileName(
@@ -1610,8 +1642,7 @@ class AbaForm(QWidget):
             writer = csv.writer(f, delimiter=";")
             writer.writerow(hdrs)
             writer.writerows(linhas)
-        QMessageBox.information(self, "Sucesso",
-            f"{self._table.rowCount()} registros exportados para:\n{path}")
+        self._msg_exportados(len(linhas), path)
 
     def refresh(self):
         self._carregar()
